@@ -64,7 +64,7 @@ IOC 反转控制 是Spring的基础，Inversion Of Control
 
 
 #### 用过annotation方式注入
-我觉得可读性不是很强，不如多写一点xml。
+Annotation注解的方式是后期一直使用的，更加方便。SpringBoot中也大量使用，不再用xml
 
 不过评论里说，每种注解方有各自得应用场景。（后续补充
 
@@ -425,14 +425,14 @@ Spring中有三种自动装配方式
 
 
 
-### 7.1、测试
+### 5.1、测试
 
 1. 环境搭建
     - 一个人有两个宠物
 
 
 
-### 7.2、byName 自动装配
+### 5.2、byName 自动装配
 
 ```xml
     <bean id="cat" class="com.kicc.pojo.Cat"/>
@@ -449,7 +449,7 @@ Spring中有三种自动装配方式
 
 
 
-### 7.3、 byType 自动装配
+### 5.3、 byType 自动装配
 
 ```xml
     <bean class="com.kicc.pojo.Cat"/>
@@ -471,7 +471,7 @@ Spring中有三种自动装配方式
 - byName的时候，需要保证所有的bean的id唯一，并且这个bean需要和自动注入的属性的set方法的值一致！
 - byType的时候，需要保证所有bean的class唯一，并且这个bean需要和自动注入的属性的类型一致！
 
-### 7.4、使用注解实现自动装配
+### 5.4、使用注解实现自动装配
 
 
 
@@ -661,7 +661,7 @@ xml 和 注解:
 - xml 万能的，适用于任何场景。维护简单方便。
 - 注解不是自己类用不了，维护相对复杂。
 
-xml和注解的最佳实践：
+**xml和注解的最佳实践：**
 
 - xml用来管理bean
 - 注解只负责完成属性的注入
@@ -879,7 +879,7 @@ public class MyTest {
 
 
 
-### 10.2、加深理解
+### 8.2、加深理解
 
 接口
 
@@ -998,6 +998,8 @@ public class Client {
 
 在公司开发中，为增加新的功能而改动原来可行的代码是大忌。
 
+但是，确实增加了代码量！这也是缺点之一。我们用动态代理解决这个问题。
+
 ![image-20200609161707200](What is Spring.assets/image-20200609161707200.png)
 
 
@@ -1006,13 +1008,154 @@ public class Client {
 
 
 
-### 10.3、动态代理
+### 10.3、动态代理（利用反射）
+
+- 动态代理和静态代理角色一样
+- 动态代理的代理类是动态生成的，不是我们直接写好的！
+- 动态代理分为两类：基于接口的动态代理，基于类的动态代理
+    - 基于接口---jdk 动态代理 【我们在这里使用】
+    - 基于类：cglib
+    - java字节码实现：javassit
 
 
 
+主要涉及到两个重要的类 Proxy 和 InvocationHandler
+
+- Proxy：java.lang.reflect.Proxy。提供了创建动态类代理和实例的静态方法。下面 f 就是一个代理实例。
+
+    ```java
+    Foo f = (Foo) Proxy.newProxyInstance(Foo.class.getClassLoader(),
+                                              new Class<?>[] { Foo.class },
+                                              handler);
+    ```
+
+- InvocationHandler：is the interface implemented by the *invocation handler* of a proxy instance. 是由代理实例的invocation handler实现的接口。
 
 
-## AOP Aspect Oriented Program	
+
+动态代理类实现InvocationHandler接口
+
+```java
+package com.kicc.demo04;
+
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+
+/**
+ * @author Kicc on 20/6/9.
+ */
+public class ProxyInvocationHandler implements InvocationHandler {
+
+    /**
+     * 被代理的接口
+     */
+    private Object target;
+
+    /**
+     * 必须实现setter方法
+     * @param target
+     */
+    public void setTarget(Object target) {
+        this.target = target;
+    }
+
+    /**
+     * 生产动态代理类/实例
+     */
+    public Object getProxy() {
+        return  Proxy.newProxyInstance(this.getClass().getClassLoader(),
+                target.getClass().getInterfaces(), this);
+    }
+
+    /**
+     * 处理代理的实例，并返回结果（真实地调用）
+     * @param proxy
+     * @param method
+     * @param args
+     * @return
+     * @throws Throwable
+     */
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        log(method.getName());
+        Object result = method.invoke(target, args);
+        return result;
+    }
+
+    public void log(String msg) {
+        System.out.println("执行了" + msg + "方法");
+    }
+}
+```
+
+
+
+测试
+
+```java
+public class Client {
+    public static void main(String[] args) {
+
+        // 真实的角色 （等价于房东）
+        UserServiceImpl userService = new UserServiceImpl();
+
+        //代理角色，不存在
+        ProxyInvocationHandler pih = new ProxyInvocationHandler();
+
+        // 设置要代理的对象
+        pih.setTarget(userService);
+
+        // 动态生成代理对象 （强转成接口，而不是实现类）
+        UserService proxy = (UserService) pih.getProxy();
+
+        // 代理对象调用方法
+        proxy.add();
+
+
+    }
+}
+```
+
+
+
+动态代理的好处：
+
+- 可以使真实角色的操作更加纯粹 （房东租房）不需要去关注一些公共业务
+- 公共就交给了代理角色。实现了业务的分工。
+- 公共业务发生扩展的时候，方便集中管理
+- 一个动态代理类可以代理多个类。他代理的是一类业务。
+
+
+
+- 对于原本的静态代理。有一个接口UserService。
+
+    实现类 UserServiceImpl。 为了加一个log，实现了一个代理类 UserServiceProxy（实现类的实例作为字段）。用这个代理类去唯一代理实现类；
+
+    那么我每实现一个UserService，就需要写一个对应的Proxy。代码量翻倍。
+
+- 动态代理。有一个接口UserService。
+
+    实现类UserServiceImpl。为了加一个log，实现一个ProxyInvocationHandler。（字段是Object，不是实现类）。用这个类去生成代理实现实例。
+
+    使用时：
+
+    1. 创建实现类的实例
+    2. 生成代理角色（不是代理类、代理实例）
+    3. 代理角色设置对象，1中的实例
+    4. 动态的生成代理对象：getProxy
+    5. 代理对象调用方法。
+
+    
+
+
+
+## 9、AOP Aspect Oriented Program	
+
+
+
+### 9.1、 什么是AOP
+
+​	
 
 首先，在面向切面编程的思想里面，把功能分为核心业务功能，和周边功能。
 
@@ -1026,4 +1169,298 @@ public class Client {
 然后把切面功能和核心业务功能 "**编织**" 在一起，这就叫AOP
 
 ### 共2类业务
-![c4fd3d0d3e559d5aaf27e89d89311ea0.png](en-resource://database/3470:1)
+
+### 9.2、AOP在Spring中的作用
+
+提供声明式事务：；允许用户自定义切面
+
+- 横切关注点：跨越应用程序多个模块的方法或功能。即是，与我们业务逻辑无关的，但是我们需要关注的部分，就是横切关注点。如日志，安全，缓存，事务等等...
+- 切面（Aspect）：横切关注点 被模块化的特殊对象。即，它是一个类。
+- 通知（Advice）：切面必须要完成的工作。即，它是类中的一个方法。
+- 目标（Target）：被通知的对象。
+- 代理（Proxy）：向目标对象应用通知后创建的对象。
+- 切入点（PointCut）：切面通知执行的 位置
+- 连接点（JointPoint）：与切入点匹配的执行点。
+
+
+
+
+
+### 9.3、使用Spring实现Aop（跟代理实现的功能类似）
+
+【重点】 使用AOP织入，需要导入一个依赖包
+
+```xml
+<dependency>
+    <groupId>org.aspectj</groupId>
+    <artifactId>aspectjweaver</artifactId>
+    <version>1.8.13</version>
+</dependency>
+```
+
+
+
+#### 方式一：使用Spring的接口
+
+用添加一个前置功能，只要去实现Spring提供的 MethodABeforeAdvice接口就可以。
+
+
+
+接口
+
+```java
+public interface UserService {
+    public void add();
+    public void delete();
+    public void update();
+    public void query();
+}
+```
+
+
+
+实现类
+
+```java
+public class UserServiceImpl implements UserService{
+    public void add() {
+        System.out.println("增加一个用户");
+    }
+
+    public void delete() {
+        System.out.println("删除一个用户");
+
+    }
+
+    public void update() {
+        System.out.println("更新一个用户");
+
+    }
+
+    public void query() {
+        System.out.println("查询一个用户");
+
+    }
+}
+```
+
+
+
+前置切入
+
+```java
+import org.springframework.aop.MethodBeforeAdvice;
+
+import java.lang.reflect.Method;
+
+/**
+ * @author Kicc on 20/6/10.
+ */
+public class Log implements MethodBeforeAdvice {
+    /**
+     * Logger
+     * @param method 要执行对的目标对象的方法
+     * @param args 参数
+     * @param target 目标对象
+     * @throws Throwable
+     */
+    public void before(Method method, Object[] args, Object target) throws Throwable {
+        System.out.println(target.getClass().getName() + "." + method.getName() + " is running!");
+    }
+}
+```
+
+
+
+后置切入
+
+```java
+import org.springframework.aop.AfterReturningAdvice;
+
+import java.lang.reflect.Method;
+
+/**
+ * @author Kicc on 20/6/10.
+ */
+public class LogAfter implements AfterReturningAdvice {
+
+    /**
+     *
+     * @param returnValue 返回的对象
+     * @param method
+     * @param args
+     * @param target
+     * @throws Throwable
+     */
+    public void afterReturning(Object returnValue, Method method, Object[] args, Object target) throws Throwable {
+        if (returnValue!=null){
+            System.out.println(target.getClass().getName() + "执行" + method.getName() + "后返回了" + returnValue.getClass().getName());
+        }
+        else{
+            System.out.println(target.getClass().getName() + "执行" + method.getName() + "后返回了" + returnValue);
+
+        }
+
+    }
+}
+```
+
+
+
+原生Spring API xml方式切入
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+        https://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/aop
+        https://www.springframework.org/schema/aop/spring-aop.xsd">
+
+
+    <bean id="userService" class="com.kicc.service.UserServiceImpl"/>
+    <bean id="log" class="com.kicc.log.Log"/>
+    <bean id="logAfter" class="com.kicc.log.LogAfter"/>
+
+<!--    方式一：使用原生Spring API接口-->
+    <!--配置AOP，需要导入AOP的约束-->
+    <aop:config>
+
+        <!--切入点,expression：表达式 execution（要执行的位置）-->
+        <aop:pointcut id="pointcut" expression="execution(* com.kicc.service.UserServiceImpl.*(..))"/>
+
+        <!--执行环绕增加！-->
+        <aop:advisor advice-ref="log" pointcut-ref="pointcut"/>
+        <aop:advisor advice-ref="logAfter" pointcut-ref="pointcut"/>
+
+    </aop:config>
+
+</beans>
+```
+
+​	
+
+	1. 导入AOP的依赖
+ 	2. 配置AOP
+     - 添加切入点（需要执行的位置）这里是对于UserServiceImpl下所有方法
+     - 添加环绕（前后）。需要指定用哪个实例和哪个切入点。
+
+
+
+#### 方式二 ： 自定义实现AOP（主要是自定义切面）
+
+
+
+- 自定义切面类：
+
+```java
+public class Diy {
+    public void before() {
+        System.out.println("============= 执行前 ===========");
+    }
+
+    public void after() {
+        System.out.println("============= 执行后 ===========");
+    }
+}
+```
+
+- 编写xml
+
+```xml
+<!--方式二：自定义类-->
+<bean id="diy" class="com.kicc.diy.Diy"/>
+
+<aop:config>
+    <!--自定义切面，ref用引用的类-->
+    <aop:aspect ref="diy">
+        <!--定义切入点-->
+        <aop:pointcut id="point" expression="execution(* com.kicc.service.UserServiceImpl.*(..))"/>
+        <!--通知-->
+        <aop:before method="before" pointcut-ref="point"/>
+        <aop:after method="after" pointcut-ref="point"/>
+
+    </aop:aspect>
+</aop:config>
+```
+
+1. bean注入切面类
+2. 在aop中定义切面Aspect
+3. 定义切入点PointCut，完成表达式
+4. 加入通知Advice（具体的方法）
+
+
+
+#### 方式三：注解方式
+
+注解实现类
+
+```java
+@Aspect //声明了这是个切面类
+public class AnnotationPointCut {
+
+    // @Before 完成了Advice，value则定义了切入点
+    @Before(value ="  execution(* com.kicc.service.UserServiceImpl.*(..))")
+    public void before() {
+        System.out.println("================ 执行前 ===================");
+    }
+
+    @After(value = "execution(* com.kicc.service.UserServiceImpl.*(..))")
+    public void after() {
+        System.out.println("================ 执行后 ===================");
+    }
+}
+```
+
+
+
+xml
+
+```xml
+<!--方式三 注解-->
+<bean id="annotationPointCut" class="com.kicc.diy.AnnotationPointCut"/>
+
+<aop:aspectj-autoproxy/>
+```
+
+
+
+测试
+
+```java
+public class MyTest {
+    public static void main(String[] args) {
+        ApplicationContext context = new ClassPathXmlApplicationContext("applicationContext.xml");
+        UserService userService = (UserService) context.getBean("userService");
+        userService.add();
+    }
+}
+```
+
+
+
+注意：测试类中的代码没有改变。
+
+
+
+总结：
+
+- AOP本身只是一种思想，在Spring中的实现，编码也很简单。
+- 目的是在不改变原有代码逻辑的基础上，进行功能的增加。
+- 相比于手动实现动态代理，我们不需要去创建代理类、实例。我们getBean也是在获得原来的service，只是自动地加入了切面类。
+
+
+
+
+
+## 10、整合Mybatis
+
+
+
+步骤：
+
+1. 导入相关jar包
+2. 编写配置文件
+3. 测试
