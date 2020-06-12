@@ -575,3 +575,8 @@ public class EmpServiceImpl implements IEmpService {
 - 通过DAOFactory调用静态方法获得EmpDAO的实例。
 - 通过实例去调用DAO层的各个原子性操作来完成业务逻辑。
 
+
+
+
+
+测试
