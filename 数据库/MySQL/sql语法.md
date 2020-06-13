@@ -81,7 +81,7 @@ select * from Score where Degree between 60 and 80;
 select * from Score where Degree>=60 and Degree<=80;
 ```
 
-## 
+
 
 ## 多个Order by
 
@@ -89,7 +89,7 @@ select * from Score where Degree>=60 and Degree<=80;
 select * from Score order by Cno asc,Degree desc;
 ```
 
-## 
+
 
 ## 选最高项对应的其他字段 (排序或者子查询)
 
@@ -101,11 +101,13 @@ select Sno,Cno from Score order by Degree desc limit 0,1;
 select Sno,Cno from Score where Degree = (select max(Degree) from Score);
 ```
 
-## 
+
 
 ## 有where的查询，还有group by的查询 （牢记查询的顺序）
 
 select ...from ...where ... group by ... having ...
+
+查询Score表中至少有5名学生选修的并以3开头的课程的平均分数。
 
 ```sql
 select cno, avg(degree)
@@ -115,40 +117,72 @@ group by cno
 having count(sno)>=3;
 ```
 
-## 
+
+
+
+
+## 两表查询 & 内连接
+
+查询所有学生的Sname、Cno和Degree列。
 
 ```sql
-select distinct Depart from teacher;
+select s.sname, c.cno, c.degree
+from score c, student s
+where c.sno = s.sno;
 ```
 
-## 
-
 ```sql
-select distinct Depart from teacher;
+select s.sname, c.cno, c.degree
+from score c inner join student s
+on c.sno = s.sno;
 ```
 
-## 
+注意：
+
+- 多表查询用逗号分隔
+- inner join 的关键字用的是on，不是where。
+
+
+
+## 多表查询 （原理跟2表一样）
+
+查询所有学生的Sname、Cname和Degree列
 
 ```sql
-select distinct Depart from teacher;
+select s.sname, sc.cno, c.cname, sc.degree
+from student s, score sc, course c
+where s.sno = sc.sno and c.cno = sc.cno;
 ```
 
-## 
+
+
+
+
+## 多表查询
+
+查询“95033”班学生的平均分。
+
+- 子查询
 
 ```sql
-select distinct Depart from teacher;
+select avg(degree)
+from score
+where sno in
+(select sno
+from student
+where class='95033');
 ```
 
-## 
+- 多表
 
 ```sql
-select distinct Depart from teacher;
+select avg(degree) from score,student where student.sno=score.sno and class='95033';
 ```
 
-## 
+- 内连接
 
 ```sql
-select distinct Depart from teacher;
+select avg(Degree) from Score inner join Student on Student.Sno=Score.Sno where Class='95033';
 ```
 
 ## 

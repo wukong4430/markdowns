@@ -1345,7 +1345,7 @@ public class LogAfter implements AfterReturningAdvice {
 	1. 导入AOP的依赖
  	2. 配置AOP
      - 添加切入点（需要执行的位置）这里是对于UserServiceImpl下所有方法
-     - 添加环绕（前后）。需要指定用哪个实例和哪个切入点。
+     - 添加环绕（前后）。需要指定用哪个实例和哪个切入点。execution
 
 
 
@@ -1464,3 +1464,278 @@ public class MyTest {
 1. 导入相关jar包
 2. 编写配置文件
 3. 测试
+
+
+
+### 10.1 Mybatis-Spring
+
+
+
+mybatis-cfg.xml基本上就不需要了。可以剩下 别名和settings
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE configuration
+        PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+
+    <properties resource="db.properties"/>
+    
+    <typeAliases>
+        <typeAlias type="com.kicc.pojo.User" alias="User"/>
+    </typeAliases>
+
+<!--    <settings>-->
+<!--        <setting name="" value=""/>-->
+<!--    </settings>-->
+
+</configuration>
+```
+
+
+
+#### 在spring的xml中进行配置
+
+
+
+- 配置dataSource：用于连接数据库
+
+```xml
+<!--Datasource: 使用Spring的数据源替换Mybatis的配置 c3p0 dbcp druid-->
+
+<bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+    <property name="driverClassName" value="com.mysql.jdbc.Driver"/>
+    <property name="url" value="jdbc:mysql://localhost:3306/mybatis?useSSL=true&amp;useUnicode=true&amp;characterEncoding=UTF-8"/>
+    <property name="username" value="root"/>
+    <property name="password" value="admin"/>
+
+</bean>
+```
+
+
+
+- 配置SqlSessionFactory： 全局唯一实例
+
+```xml
+<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+    <property name="dataSource" ref="dataSource" />
+    <!--绑定Mybatis配置文件-->
+    <property name="configLocation" value="classpath:mybatis-cfg.xml"/>
+    <property name="mapperLocations" value="com/kicc/mapper/UserMapper.xml"/>
+</bean>
+```
+
+configLocation: mybatis配置文件的路径
+
+mapperLocations：mappers的路径
+
+可以将mybatis中的配置都放入Spring中
+
+
+
+- 配置SqlSession（Template）：在Spring中广泛使用XXXTemplate
+
+```xml
+<!--这个Template就是我们mybatis中的sqlsession-->
+<bean id="sqlSession" class="org.mybatis.spring.SqlSessionTemplate">
+    <!--因为没有set方法，只能用构造器注入-->
+    <constructor-arg index="0" ref="sqlSessionFactory"/>
+</bean>
+```
+
+Template类只能使用构造器方式注入。
+
+
+
+- 用SqlSessionDaoSupport。就不用上述的Template注入了。
+
+```java
+public class UserDaoImpl extends SqlSessionDaoSupport implements UserDao {
+  public User getUser(String userId) {
+    return getSqlSession().selectOne("org.mybatis.spring.sample.mapper.UserMapper.getUser", userId);
+  }
+}
+```
+
+需要基础extends SqlSessionDaoSupport。这样能直接调用getSqlSession()获得一个SqlSession实例。
+
+因为新的实现类不需要注入sqlSession，但是父类SqlSessionDaoSupport需要一个SqlSessionFactory注入。
+
+```xml
+<bean id="userMapper2" class="com.kicc.mapper.UserMapperImpl2">
+    <property name="sqlSessionFactory" ref="sqlSessionFactory"/>
+</bean>
+```
+
+
+
+在mybatis的使用中，我们无需创建Impl实现类。**现在的情况是有一个接口，一个xml，一个实现类。**
+
+Spring中需要创建：
+
+```java
+public class UserMapperImpl implements UserMapper {
+
+    /**
+     * 我们所有的操作，都使用sqlSession来执行，在原来，现在都使用sqlSessionTemplate
+     */
+    private SqlSessionTemplate sqlSession ;
+
+    public void setSqlSession(SqlSessionTemplate sqlSession) {
+        this.sqlSession = sqlSession;
+    }
+
+    public List<User> getUserList() {
+        UserMapper mapper = sqlSession.getMapper(UserMapper.class);
+        return mapper.getUserList();
+    }
+```
+
+有一个唯一字段 **SqlSessionTemplate**
+
+编写CRUD直接使用Spring-mybatis框架提供的方法。例如这里用的是
+
+
+
+
+
+#### 总结
+
+1. 编写数据源dataSource配置
+2. sqlSessionFactory
+3. sqlSessionTemplate
+4. 需要给接口加实现类
+5. 将自己写的实现类，注入Spring
+
+
+
+整合过程的顺序：
+
+![image-20200613163023232](What is Spring.assets/image-20200613163023232.png)
+
+
+
+
+
+# 11 声明式事务
+
+## 11.1、回顾事务
+
+
+
+1. 一组业务要么全部成功，要么全部失败
+2. 事务在项目开发中，十分重要。涉及到了数据的一致性问题。
+3. 确保完整性和一致性。
+
+
+
+ACID原则：
+
+- Atomic：要么全部成功，要么全部失败。
+- Consistency：事务前后的某个状态要保证一致。比如A给B转钱。两个人的金额总数保持一致。
+- Isolation：
+    - 一个事务执行过程中，对其他事务是隔离的。
+- Duration：
+    - 事务一旦提交，无论系统发生什么问题，结果都被保存下来了。持久把保存到存储器中。
+
+
+
+## 11.2、Spring中的事务
+
+
+
+- 声明式事务：AOP
+- 编程式事务：try catch () {rollback}
+
+
+
+错误的事务范例：
+
+```java
+public List<User> getUserList() {
+    UserMapper mapper = getSqlSession().getMapper(UserMapper.class);
+
+    User wdb = new User((Integer) 5, "王大伯", "99797652...");
+
+    mapper.insertUser(wdb);
+    mapper.deleteUser(5);
+
+    return mapper.getUserList();
+}
+```
+
+在获取UserList方法中，首先插入一个用户，然后删除一个用户。
+
+
+
+insert和delete的sql语句：
+
+```xml
+<insert id="insertUser" parameterType="User">
+    insert into mybatis.user (id, name, pwd) values (#{id}, #{name}, #{pwd});
+</insert>
+
+<delete id="deleteUser" parameterType="int">
+    deletes from mybatis.user where id=${id};
+</delete>
+```
+
+可以看到，我故意设置了deletes，是一个错误的语法。但是插入的语句是对的。
+
+
+
+那么执行getUserList方法后，在正确的事务机制中，应该不会提交任何事务。**（原子性）**
+
+
+
+实际结果是插入成功了，这违反了事务的原则。因此我们需要添加事务功能！
+
+
+
+在spring-dao.xml中：
+
+```xml
+<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+    <property name="dataSource" ref="dataSource"/>
+</bean>
+
+<!--结合AOP，实现事务的织入-->
+<!--配置事务通知-->
+<tx:advice id="txAdvice" transaction-manager="transactionManager">
+    <!--给哪些方法 配置事务-->
+    <!--配置事务的传播特性： new propagation =-->
+    <tx:attributes>
+        <tx:method name="add" propagation="REQUIRED"/>
+        <tx:method name="delete" propagation="REQUIRED"/>
+        <tx:method name="update" propagation="REQUIRED"/>
+        <tx:method name="query" propagation="REQUIRED"/>
+    </tx:attributes>
+</tx:advice>
+
+<!--配置事务切入-->
+<aop:config>
+    <aop:pointcut id="txPointCut" expression="execution(* com.kicc.mapper.UserMapper.*(..))"/>
+    <aop:advisor advice-ref="txAdvice" pointcut-ref="txPointCut"/>
+</aop:config>
+```
+
+1. 添加transcationMangaer的bean **（开启声明式事务）**
+2. 配置事务的通知 Active （方法）
+3. 配置事务的切入（切入点和对象）
+
+在这里我们利用AOP，在不改变原来代码的情况下，添加了一个事务的功能！把事务功能看作一个方法！
+
+
+
+注意 tx:method 的 传播特性总由7种方法：
+
+- REQUIRED（默认值）：在有transaction状态下执行；如当前没有transaction，则创建新的transaction；
+- SUPPORTS：如当前有transaction，则在transaction状态下执行；如果当前没有transaction，在无transaction状态下执行；
+- MANDATORY：必须在有transaction状态下执行，如果当前没有transaction，则抛出异常IllegalTransactionStateException；
+- REQUIRES_NEW：创建新的transaction并执行；如果当前已有transaction，则将当前transaction挂起；
+- NOT_SUPPORTED：在无transaction状态下执行；如果当前已有transaction，则将当前transaction挂起；
+- NEVER：在无transaction状态下执行；如果当前已有transaction，则抛出异常IllegalTransactionStateException。
+- nest
+
+一般用默认的就行。或者用nested

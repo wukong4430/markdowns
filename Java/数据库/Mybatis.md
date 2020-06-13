@@ -235,17 +235,8 @@ junit测试
 <build>
     <resources>
         <resource>
-            <directory>src/main/resources</directory>
-            <includes>
-                <include>**/*.properties</include>
-                <include>**/*.xml</include>
-            </includes>
-            <filtering>true</filtering>
-        </resource>
-        <resource>
             <directory>src/main/java</directory>
             <includes>
-                <include>**/*.properties</include>
                 <include>**/*.xml</include>
             </includes>
             <filtering>true</filtering>
@@ -658,4 +649,8 @@ xml
         <package name="com.kicc.dao"/>
     </mappers>
 ```
+
+
+
+# 5、生命周期和作用域
 
