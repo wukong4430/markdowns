@@ -191,3 +191,132 @@ select avg(Degree) from Score inner join Student on Student.Sno=Score.Sno where 
 select distinct Depart from teacher;
 ```
 
+
+
+
+
+# 3、函数的应用
+
+
+
+## 3.1 year(date) month(date) day(date)
+
+查询和学号为108、101的同学同年出生的所有学生的Sno、Sname和Sbirthday列
+
+```sql
+select 
+	sno, sname, sbirthday
+from 
+	student
+where 
+	year(sbirthday) in 
+(select 
+ 	year(sbirthday)
+from 
+ 	student
+where 
+ 	sno in ('101', '108')
+);
+```
+
+year(date) 范围 1000~9999，不支持索引。
+
+
+
+## 3.2 Any All
+
+- 查询选修编号为“3-105“课程且成绩**至少高于**选修编号为“3-245”的同学的Cno、Sno和Degree,并按Degree从高到低次序排序。
+
+    至少高于用Any
+
+    ```sql
+    select Cno,Sno,Degree from Score where Cno = '3-105' and Degree >
+    any(select Degree from Score where Cno = '3-245') order by Degree desc;
+    
+    select Cno,Sno,Degree from Score where Cno = '3-105' and Degree >
+    (select min(Degree) from Score where Cno = '3-245') order by Degree desc;
+    #大于任何一个或者大于最小的
+    ```
+
+- 查询选修编号为“3-105”且成绩高于选修编号为“3-245”课程的同学的Cno、Sno和Degree。
+
+    ```sql
+    select Cno,Sno,Degree from Score where Cno = '3-105' and Degree > all(select Degree from Score where Cno = '3-245');
+    ```
+
+
+
+## 3.3 union
+
+联合查询，并集。
+
+- 查询所有教师和同学的name、sex和birthday。
+
+    ```sql
+    select Sname as '学生',Ssex,Sbirthday from Student
+    union
+    select Tname as '老师',Tsex,Tbirthday from Teacher;
+    ```
+
+- 查询所有“女”教师和“女”同学的name、sex和birthday。
+
+    ```sql
+    select Sname,Ssex,Sbirthday from Student where Ssex = '女'
+    union
+    select Tname,Tsex,Tbirthday from Teacher where Tsex = '女';
+    ```
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# N、引擎
+
+|              | MYISAM       | INNODB          |
+| ------------ | ------------ | --------------- |
+| 事务         | 不支持       | 支持            |
+| 数据行锁定   | 不支持（锁表 | 支持            |
+| 外键约束     | 不支持       | 支持            |
+| 全文索引     | 支持         | 不支持          |
+| 表空间的大小 | 较小         | 较大 约等于 2倍 |
+
+常规使用操作：
+
+- MYISAM 节约空间 速度较快
+- INNODB 安全性高，事务处理，多表用户操作
+
+
+
+> 在物理空间存在的位置
+
+所有的数据库文件都存在MySQL 的data目录下， 一个文件夹就对应一个数据库。
+
+
+
+MySQL引擎在物理文件上的区别
+
+- InnoDB在数据库表中只有一个*.frm文件，以及上级目录下的idbdata1文件
+- MyISAM对应文件
+    - *.frm	表结构的定义文件
+    - *.MYD  数据文件 （data）
+    - *.MYI    索引文件 （index）
