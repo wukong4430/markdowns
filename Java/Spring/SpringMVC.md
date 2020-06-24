@@ -787,7 +787,7 @@ ModelAndView 可以在储存数据的同时，可以进行设置返回的逻辑�
 
 
 
-# 中文乱码问题
+# 8 中文乱码问题
 
 如果遇到中文的乱码问题
 
@@ -797,3 +797,284 @@ https://blog.csdn.net/qq_33369905/article/details/106647331
 
 
 
+在springmvc-servlet 中加入配置 (只要用了Jackson库，就把它加上)  加上报错了。目前为解决
+
+```xml
+<mvc:annotation-driven>
+    <mvc:message-converters register-defaults="true">
+        <bean class="org.springframework.http.converter.StringHttpMessageConverter">
+            <constructor-arg value="UTF-8"/>
+        </bean>
+        <bean class="org.springframework.http.converter.json.MappingJackson2HttpMessageConverter">
+            <property name="objectMapper">
+                <bean class="org.springframework.http.converter.json.Jackson2ObjectMapperFactoryBean">
+                    <property name="failOnEmptyBeans" value="false"/>
+                </bean>
+            </property>
+        </bean>
+    </mvc:message-converters>
+</mvc:annotation-driven>
+```
+
+
+
+
+
+
+
+# 9 JSON
+
+在前后端分离的架构中，我们在Controller中不需要返回视图解析器了。直接返回Json跟前端交互。
+
+创建User类
+
+```java
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class User {
+    private String name;
+    private int age;
+    private String sex;
+}
+```
+
+
+
+## 9.1 Jackson
+
+
+
+创建UserController
+
+```java
+@RestController
+public class UserController {
+
+    @RequestMapping(value = "/j1", produces = "text/plain;charset=UTF-8")
+    @ResponseBody //这句话加了之后，就不会走视图解析器，会直接返回一个字符串
+    public String json1() throws JsonProcessingException {
+
+        ObjectMapper omapper = new ObjectMapper();
+
+        User user = new User("Kicc", 24, "男");
+
+        String s = omapper.writeValueAsString(user);
+
+        return s;
+    }
+}
+```
+
+1. 加了RestController注解后，类中的方法都返回Json，而不是视图。
+2. 如果类上面不加RestController这个注解。那么可以在方法上加ResponseBody注解。效果一致
+    1. 也就是说RestController = @ResponseBody + @Controller
+3. 用了Jackson这个库。需要创建一个ObjectMapper实例。把String传入进去。返回。
+
+
+
+需要返回的是多个Json：
+
+```java
+@RequestMapping("/j2")
+public String json2() throws JsonProcessingException {
+
+    List<User> users = new ArrayList<User>();
+
+    User user3 = new User("user1", 20, "male");
+    User user = new User("user2", 21, "male");
+    User user1 = new User("user3", 22, "female");
+    User user2 = new User("user4", 23, "female");
+
+    users.add(user);
+    users.add(user1);
+    users.add(user2);
+    users.add(user3);
+
+    return new ObjectMapper().writeValueAsString(users);
+}
+```
+
+
+
+返回日期：
+
+```java
+public String json3() throws JsonProcessingException {
+
+    Date date = new Date();
+
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    
+    return new ObjectMapper().writeValueAsString(sdf.format(date));
+}
+```
+
+默认日期Date是时间戳输出。要用SimpleDateFormat 转化一下。
+
+
+
+同样，Jackson中提供了这种日期转化的支持：
+
+```java
+@RequestMapping("/j3")
+public String json3() throws JsonProcessingException {
+
+    ObjectMapper objectMapper = new ObjectMapper();
+    // 不使用时间戳
+    objectMapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+    objectMapper.setDateFormat(sdf);
+
+    Date date = new Date();
+
+    return new ObjectMapper().writeValueAsString(date);
+}
+```
+
+- 需要配置一个不使用时间戳的configure
+- 再setDateFormat
+
+
+
+因为每个类中都用到了ObjectMapper，所以可以整个Utils。
+
+
+
+```java
+public class JsonUtils {
+
+    public static String getJson(Object object) {
+        return getJson(object, "yyyy-MM-dd HH:MM:ss");
+    }
+
+    public static String getJson(Object object, String dateFormat) {
+
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        SimpleDateFormat sdf = new SimpleDateFormat(dateFormat);
+        objectMapper.setDateFormat(sdf);
+
+        try {
+            return objectMapper.writeValueAsString(object);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+        return null;
+
+    }
+}
+```
+
+
+
+## 9.2 FastJson (alibaba)
+
+```java
+
+        System.out.println("*******Java对象 转 JSON字符串*******");
+        String str1 = JSON.toJSONString(list);
+        System.out.println("JSON.toJSONString(list)==>"+str1);
+        String str2 = JSON.toJSONString(user1);
+        System.out.println("JSON.toJSONString(user1)==>"+str2);
+ 
+        System.out.println("\n****** JSON字符串 转 Java对象*******");
+        User jp_user1=JSON.parseObject(str2,User.class);
+        System.out.println("JSON.parseObject(str2,User.class)==>"+jp_user1);
+ 
+        System.out.println("\n****** Java对象 转 JSON对象 ******");
+        JSONObject jsonObject1 = (JSONObject) JSON.toJSON(user2);
+        System.out.println("(JSONObject) JSON.toJSON(user2)==>"+jsonObject1.getString("name"));
+ 
+        System.out.println("\n****** JSON对象 转 Java对象 ******");
+        User to_java_user = JSON.toJavaObject(jsonObject1, User.class);
+        System.out.println("JSON.toJavaObject(jsonObject1, User.class)==>"+to_java_user)
+```
+
+- toJSONString()
+- parseObject()：解析为一个Java对象
+- toJSON()：js对象
+- toJavaObject()
+
+
+
+
+
+# 10 SSM 整合
+
+
+
+## 10.1 Mybatis 层
+
+
+
+## 10.2 Spring 层
+
+1. 创建 Spring-dao.xml
+
+    1. 关联数据库配置文件
+
+        ```xml
+        <!--1. 关联数据库配置文件-->
+        <context:property-placeholder location="classpath:database.properties"/>
+        ```
+
+        
+
+    2. 数据库连接池
+
+        ```xml
+        <!--2. 连接池
+            dbcp: 半自动化， 不能自动连接
+            c3p0: 自动化操作（自动化的加载配置文件，并且可以自动设置到对象中）
+            druid
+            hikari：SpringBoot2.x 默认集成
+         -->
+        <bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+            <property name="driverClass" value="${jdbc.driver}"/>
+            <property name="jdbcUrl" value="${jdbc.url}"/>
+            <property name="user" value="${jdbc.username}"/>
+            <property name="password" value="${jdbc.password}"/>
+        </bean>
+        ```
+
+        c3p0还有一些其他的配置：
+
+        ```xml
+               <!-- c3p0连接池的私有属性 -->
+                <property name="maxPoolSize" value="30"/>
+                <property name="minPoolSize" value="10"/>
+                <!-- 关闭连接后不自动commit -->
+                <property name="autoCommitOnClose" value="false"/>
+                <!-- 获取连接超时时间 -->
+                <property name="checkoutTimeout" value="10000"/>
+                <!-- 当获取连接失败重试次数 -->
+                <property name="acquireRetryAttempts" value="2"/>
+        
+        ```
+
+    3. 添加sqlSessionFactory
+
+        ```xml
+        <!--3. sqlSessionFactory-->
+        <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+            <property name="dataSource" ref="dataSource"/>
+            <property name="configLocation" value="classpath:mybatis-concfg.xml"/>
+        </bean>
+        ```
+
+    4. 添加一个能省区创建DaoImpl的配置
+
+        ```xml
+        <!--4. 配置dao接口扫描包，动态的实现了Dao接口 可以注入到Spring容器中-->
+        <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+            <!--注入 sqlSessionFactory-->
+            <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"/>
+            <!--要扫描的包-->
+            <property name="basePackage" value="com.kicc.dao"/>
+        </bean>
+        ```
+
+        - 添加了这个配置之后我们就不需要再去手动实现DaoImpl

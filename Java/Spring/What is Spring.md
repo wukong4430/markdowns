@@ -7,7 +7,7 @@
 - 控制反转，面向切面编程
 - 支持事务的处理，对框架整合的支持
 
-总之，Spring是一个轻量级的IOC和面向切面的编程框架。主要用来解决企业应用开发的复杂性。
+**总之，Spring是一个轻量级的IOC和面向切面的编程框架。主要用来解决企业应用开发的复杂性。**
 
 Spring是一个基于IOC和AOP的结构J2EE系统的框架
 
@@ -23,28 +23,78 @@ IOC 反转控制 是Spring的基础，Inversion Of Control
 
 ### 思想逻辑
 
--  在传统的做法中，Dao编写是JavaBean。程序修改的主动权是在程序员手中，因此当需求发生变化时，程序员需要手动地去修改代码。
+- 在传统的做法中，Dao编写是JavaBean。程序修改的主动权是在程序员手中，因此当需求发生变化时，程序员需要手动地去修改代码。
 
-- ```java
-  public class UserServiceImpl implements UserService{
-      private UserDao userDao;
-  
-      // 利用set实现动态值的注入
-      public void setUserDao(UserDao userDao) {
-          this.userDao = userDao;
-      }
-  
-      public void getUser() {
-          userDao.getUser();
-      }
-  }
-  ```
+    ```java
+    public class UserServiceImpl implements UserService{
+        private UserDao userDao = new UserDaoImpl();
+    
+    
+        public void getUser() {
+            userDao.getUser();
+        }
+    }
+    ```
 
-  
+    
 
-- 之后用了 set注入的方式，程序不再具有主动性，而是变成l被动接受的对象。这是最初的IoC思想。
+    在业务层的实现中，创建了一个DaoImpl的实现对象。
 
-#### Spring 究竟干了啥子
+    
+
+    假设此时我们多了一个MySQL的Dao接口
+
+    ```java
+    public class UserDaoMysqlImpl implements UserDao{
+        public void getUser() {
+            System.out.println("Get Mysql information from UserDao.");
+        }
+    }
+    ```
+
+    
+
+    那么我们需要手动去修改业务层（new UserDaoMysqlImpl()）
+
+    ```java
+    public class UserServiceImpl implements UserService{
+        private UserDao userDao = new UserDaoMysqlImpl();
+    
+    
+        public void getUser() {
+            userDao.getUser();
+        }
+    }
+    ```
+
+    
+
+    
+
+    **重点来了！**
+
+    之后用了 set注入的方式，程序不再具有主动性，而是变成l被动接受的对象。这是最初的IoC思想。
+
+    这样我们在创建UserServiceImpl实例的时候，不需要去修改原来的程序，只要在传入userDao.
+
+    ```java
+    public class UserServiceImpl implements UserService{
+        private UserDao userDao;
+    
+        // 利用set实现动态值的注入
+        public void setUserDao(UserDao userDao) {
+            this.userDao = userDao;
+        }
+    
+        public void getUser() {
+            userDao.getUser();
+        }
+    }
+    ```
+
+    
+
+- Spring 究竟干了啥子
 
 >用了Spring之后，对象的创建、管理、控制都交给Spring来完成。这就是Ioc的本质。程序员也不需要去修改程序代码，用户的需求改变也不需要去main中传入什么参数去获取不同的service。只需要在xml文件中去修改就行了。
 
@@ -430,9 +480,34 @@ Spring中有三种自动装配方式
 1. 环境搭建
     - 一个人有两个宠物
 
+```java
+public class Person {
+    private String name = "凯哥";
+    // 如果required = fasle, 传入的是null或者不传也行
 
+    @Resource
+    private Dog dog;
+
+    @Resource(name = "cat22")
+    private Cat cat;
+```
 
 ### 5.2、byName 自动装配
+
+不适用自动装配：
+
+```xml
+<bean id="cat22" class="com.kicc.pojo.Cat"/>
+<bean id="dog" class="com.kicc.pojo.Dog"/>
+
+<bean id="kai" class="com.kicc.pojo.Person">
+    <property name="name" value="kai"/>
+    <property name="dog" ref="dog"/>
+    <property name="cat" ref="cat22"/>
+</bean>
+```
+
+使用byName的装配：（减少了dog和cat的重复引用）
 
 ```xml
     <bean id="cat" class="com.kicc.pojo.Cat"/>
@@ -581,7 +656,9 @@ public class Person {
 
 在Srping4之后，要使用注解开发，必须要保证aop的包导入
 
+@AutoWired、@Resource、是用在属性字段上的。
 
+下面要讲的@Component、@Repository、@Controller、@Service是用在类上的。用了这几个注解之后，不需要在xml中添加bean了。
 
 ### 6.1、bean
 
@@ -635,6 +712,9 @@ public class User {
 ### 6.5、作用域
 
 ```java
+/*
+等价于 <bean id="user" class="com.kicc.dao.User"/>
+* */
 @Component
 @Scope("singleton")
 public class User {
@@ -680,7 +760,7 @@ xml 和 注解:
 
 我们现在要完全不适用Spring的xml配置，全权交给java来做
 
-JavaConfig是Spring的一个子项目
+JavaConfig是Spring的一个子项目。用JavaConfig类代替xml的作用。
 
 
 
