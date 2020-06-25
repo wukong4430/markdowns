@@ -1004,13 +1004,96 @@ public class JsonUtils {
 
 # 10 SSM 整合
 
+pom.xml文件：
+
+1. 包依赖
+
+    - junit
+    - mysql-connect-java, 
+    - 数据连接池 c3p0
+    - servlet-api, jsp-api, jstl, 
+    - mybatis, mybatis-spring
+    - spring-jdbc, spring-webmvc
+    - lombok
+
+2. 非resources下的xml文件包含：
+
+    ```xml
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/java</directory>
+                <includes>
+                    <include>**/*.properties</include>
+                    <include>**/*.xml</include>
+                </includes>
+                <filtering>false</filtering>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <includes>
+                    <include>**/*.properties</include>
+                    <include>**/*.xml</include>
+                </includes>
+                <filtering>false</filtering>
+            </resource>
+        </resources>
+    </build>
+    ```
+
+    
+
 
 
 ## 10.1 Mybatis 层
 
+1. 创建POJO类
+
+    ```java
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public class Books {
+        private int bookID;
+        private String bookName;
+        private int bookCounts;
+        private String detail;
+    }
+    ```
+
+2. 创建db.properties
+
+    ```xml
+    jdbc.driver=com.mysql.jdbc.Driver
+    jdbc.url=jdbc:mysql://localhost:3306/ssmbuild?useSSL=true&useUnicode=true&characterEncoding=utf8
+    jdbc.username=root
+    jdbc.password=admin
+    ```
+
+3. 创建mybatis-config.xml
+
+    ```xml
+    <?xml version="1.0" encoding="UTF-8" ?>
+    <!DOCTYPE configuration
+            PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+            "http://mybatis.org/dtd/mybatis-3-config.dtd">
+    <configuration>
+    
+        <typeAliases>
+            <package name="com.kicc.pojo"/>
+        </typeAliases>
+    <!--    <mappers>-->
+    <!--        <mapper resource="com/kicc/dao/BookMapper.xml"/>-->
+    <!--    </mappers>-->
+    
+    </configuration>
+    ```
+
+4. 
 
 
-## 10.2 Spring 层
+
+## 10.2 Spring-dao 层
 
 1. 创建 Spring-dao.xml
 
@@ -1058,14 +1141,23 @@ public class JsonUtils {
     3. 添加sqlSessionFactory
 
         ```xml
-        <!--3. sqlSessionFactory-->
+        <!-- 3.配置SqlSessionFactory对象 -->
         <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+            <!-- 注入数据库连接池 -->
             <property name="dataSource" ref="dataSource"/>
-            <property name="configLocation" value="classpath:mybatis-concfg.xml"/>
+            <!-- 配置MyBaties全局配置文件:mybatis-config.xml -->
+            <property name="configLocation" value="classpath:mybatis-config.xml"/>
+            <property name="mapperLocations">
+                <list>
+                    <value>classpath:com/kicc/dao/BookMapper.xml</value>
+                </list>
+            </property>
         </bean>
         ```
 
-    4. 添加一个能省区创建DaoImpl的配置
+        在sqlSessionFactory的 mapperLocations中配置了xml路径后，就不需要去mybatis-config.xml中配置mapper了。（两个文件配置一个就好）
+
+    4. 添加一个能省去创建MapperImpl的配置
 
         ```xml
         <!--4. 配置dao接口扫描包，动态的实现了Dao接口 可以注入到Spring容器中-->
@@ -1077,4 +1169,40 @@ public class JsonUtils {
         </bean>
         ```
 
-        - 添加了这个配置之后我们就不需要再去手动实现DaoImpl
+        - 添加了这个配置之后我们就不需要再去手动实现MapperImpl
+
+        - 如果我们不用这个接口扫描包，则必须创建一个MapperImpl：
+
+            ```java
+            public class BookMapperImpl extends SqlSessionDaoSupport implements BookMapper{
+                public int addBook(Books book) {
+                    return getSqlSession().getMapper(BookMapper.class).addBook(book);
+                }
+            
+                public int deleteBookById(Integer id) {
+                    return getSqlSession().getMapper(BookMapper.class).deleteBookById(id);
+                }
+            
+                public int updateBook(Books book) {
+                    return getSqlSession().getMapper(BookMapper.class).updateBook(book);
+                }
+            
+                public Books queryBookById(Integer id) {
+                    return getSqlSession().getMapper(BookMapper.class).queryBookById(id);
+                }
+            
+                public List<Books> queryAllBook() {
+                    return getSqlSession().getMapper(BookMapper.class).queryAllBook();
+                }
+            }
+            ```
+
+    再绑定一个bean：
+
+    ```xml
+    <bean id="bookMapper" class="com.kicc.dao.BookMapperImpl">
+        <property name="sqlSessionFactory" ref="sqlSessionFactory"/>
+    </bean>
+    ```
+
+    
