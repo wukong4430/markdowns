@@ -1095,114 +1095,409 @@ pom.xml文件：
 
 ## 10.2 Spring-dao 层
 
-1. 创建 Spring-dao.xml
+### 10.2.1 spring-dao.xml
 
-    1. 关联数据库配置文件
 
-        ```xml
-        <!--1. 关联数据库配置文件-->
-        <context:property-placeholder location="classpath:database.properties"/>
-        ```
 
-        
+创建 Spring-dao.xml
 
-    2. 数据库连接池
-
-        ```xml
-        <!--2. 连接池
-            dbcp: 半自动化， 不能自动连接
-            c3p0: 自动化操作（自动化的加载配置文件，并且可以自动设置到对象中）
-            druid
-            hikari：SpringBoot2.x 默认集成
-         -->
-        <bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
-            <property name="driverClass" value="${jdbc.driver}"/>
-            <property name="jdbcUrl" value="${jdbc.url}"/>
-            <property name="user" value="${jdbc.username}"/>
-            <property name="password" value="${jdbc.password}"/>
-        </bean>
-        ```
-
-        c3p0还有一些其他的配置：
-
-        ```xml
-               <!-- c3p0连接池的私有属性 -->
-                <property name="maxPoolSize" value="30"/>
-                <property name="minPoolSize" value="10"/>
-                <!-- 关闭连接后不自动commit -->
-                <property name="autoCommitOnClose" value="false"/>
-                <!-- 获取连接超时时间 -->
-                <property name="checkoutTimeout" value="10000"/>
-                <!-- 当获取连接失败重试次数 -->
-                <property name="acquireRetryAttempts" value="2"/>
-        
-        ```
-
-    3. 添加sqlSessionFactory
-
-        ```xml
-        <!-- 3.配置SqlSessionFactory对象 -->
-        <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
-            <!-- 注入数据库连接池 -->
-            <property name="dataSource" ref="dataSource"/>
-            <!-- 配置MyBaties全局配置文件:mybatis-config.xml -->
-            <property name="configLocation" value="classpath:mybatis-config.xml"/>
-            <property name="mapperLocations">
-                <list>
-                    <value>classpath:com/kicc/dao/BookMapper.xml</value>
-                </list>
-            </property>
-        </bean>
-        ```
-
-        在sqlSessionFactory的 mapperLocations中配置了xml路径后，就不需要去mybatis-config.xml中配置mapper了。（两个文件配置一个就好）
-
-    4. 添加一个能省去创建MapperImpl的配置
-
-        ```xml
-        <!--4. 配置dao接口扫描包，动态的实现了Dao接口 可以注入到Spring容器中-->
-        <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
-            <!--注入 sqlSessionFactory-->
-            <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"/>
-            <!--要扫描的包-->
-            <property name="basePackage" value="com.kicc.dao"/>
-        </bean>
-        ```
-
-        - 添加了这个配置之后我们就不需要再去手动实现MapperImpl
-
-        - 如果我们不用这个接口扫描包，则必须创建一个MapperImpl：
-
-            ```java
-            public class BookMapperImpl extends SqlSessionDaoSupport implements BookMapper{
-                public int addBook(Books book) {
-                    return getSqlSession().getMapper(BookMapper.class).addBook(book);
-                }
-            
-                public int deleteBookById(Integer id) {
-                    return getSqlSession().getMapper(BookMapper.class).deleteBookById(id);
-                }
-            
-                public int updateBook(Books book) {
-                    return getSqlSession().getMapper(BookMapper.class).updateBook(book);
-                }
-            
-                public Books queryBookById(Integer id) {
-                    return getSqlSession().getMapper(BookMapper.class).queryBookById(id);
-                }
-            
-                public List<Books> queryAllBook() {
-                    return getSqlSession().getMapper(BookMapper.class).queryAllBook();
-                }
-            }
-            ```
-
-    再绑定一个bean：
+1. 关联数据库配置文件
 
     ```xml
-    <bean id="bookMapper" class="com.kicc.dao.BookMapperImpl">
-        <property name="sqlSessionFactory" ref="sqlSessionFactory"/>
-    </bean>
+    <!--1. 关联数据库配置文件-->
+    <context:property-placeholder location="classpath:database.properties"/>
     ```
 
     
+
+2. 数据库连接池
+
+    ```xml
+    <!--2. 连接池
+        dbcp: 半自动化， 不能自动连接
+        c3p0: 自动化操作（自动化的加载配置文件，并且可以自动设置到对象中）
+        druid
+        hikari：SpringBoot2.x 默认集成
+     -->
+    <bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+        <property name="driverClass" value="${jdbc.driver}"/>
+        <property name="jdbcUrl" value="${jdbc.url}"/>
+        <property name="user" value="${jdbc.username}"/>
+        <property name="password" value="${jdbc.password}"/>
+    </bean>
+    ```
+
+    c3p0还有一些其他的配置：
+
+    ```xml
+           <!-- c3p0连接池的私有属性 -->
+            <property name="maxPoolSize" value="30"/>
+            <property name="minPoolSize" value="10"/>
+            <!-- 关闭连接后不自动commit -->
+            <property name="autoCommitOnClose" value="false"/>
+            <!-- 获取连接超时时间 -->
+            <property name="checkoutTimeout" value="10000"/>
+            <!-- 当获取连接失败重试次数 -->
+            <property name="acquireRetryAttempts" value="2"/>
+    
+    ```
+
+3. 添加sqlSessionFactory
+
+    ```xml
+    <!-- 3.配置SqlSessionFactory对象 -->
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+        <!-- 注入数据库连接池 -->
+        <property name="dataSource" ref="dataSource"/>
+        <!-- 配置MyBaties全局配置文件:mybatis-config.xml -->
+        <property name="configLocation" value="classpath:mybatis-config.xml"/>
+        <property name="mapperLocations">
+            <list>
+                <value>classpath:com/kicc/dao/BookMapper.xml</value>
+            </list>
+        </property>
+    </bean>
+    ```
+
+    在sqlSessionFactory的 mapperLocations中配置了xml路径后，就不需要去mybatis-config.xml中配置mapper了。（两个文件配置一个就好）
+
+4. 添加一个能省去创建MapperImpl的配置
+
+    ```xml
+    <!--4. 配置dao接口扫描包，动态的实现了Dao接口 可以注入到Spring容器中-->
+    <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <!--注入 sqlSessionFactory-->
+        <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"/>
+        <!--要扫描的包-->
+        <property name="basePackage" value="com.kicc.dao"/>
+    </bean>
+    ```
+
+    - 添加了这个配置之后我们就不需要再去手动实现MapperImpl
+
+    - 如果我们不用这个接口扫描包，则必须创建一个MapperImpl：
+
+        ```java
+        public class BookMapperImpl extends SqlSessionDaoSupport implements BookMapper{
+            public int addBook(Books book) {
+                return getSqlSession().getMapper(BookMapper.class).addBook(book);
+            }
+        
+            public int deleteBookById(Integer id) {
+                return getSqlSession().getMapper(BookMapper.class).deleteBookById(id);
+            }
+        
+            public int updateBook(Books book) {
+                return getSqlSession().getMapper(BookMapper.class).updateBook(book);
+            }
+        
+            public Books queryBookById(Integer id) {
+                return getSqlSession().getMapper(BookMapper.class).queryBookById(id);
+            }
+        
+            public List<Books> queryAllBook() {
+                return getSqlSession().getMapper(BookMapper.class).queryAllBook();
+            }
+        }
+        ```
+
+再绑定一个bean：
+
+```xml
+<bean id="bookMapper" class="com.kicc.dao.BookMapperImpl">
+    <property name="sqlSessionFactory" ref="sqlSessionFactory"/>
+</bean>
+```
+
+
+
+### 10.2.2 Mapper
+
+1. 创建接口 （注意规范，换成javadoc）
+
+    ```java
+    public interface BookMapper {
+    
+        //增加一个Book
+        int addBook(Books book);
+    
+        //根据id删除一个Book
+        int deleteBookById(Integer id);
+    
+        //更新Book
+        int updateBook(Books books);
+    
+        //根据id查询,返回一个Book
+        Books queryBookById(Integer id);
+    
+        //查询全部Book,返回list集合
+        List<Books> queryAllBook();
+    
+    }
+    ```
+
+2. Mapper.xml
+
+    ```xml
+    <?xml version="1.0" encoding="UTF-8" ?>
+    <!DOCTYPE mapper
+            PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+            "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    
+    <mapper namespace="com.kicc.dao.BookMapper">
+    ```
+
+    注意namespace绑定
+
+
+
+## 10.3 spring-service 层
+
+
+
+### 10.3.1 spring-service.xml
+
+1. 导入spring-dao.xml
+
+    ```xml
+    <import resource="classpath:spring-dao.xml"/>
+    ```
+
+2. 扫描service层下的包
+
+    ```xml
+        <!--1. 扫描Service下的包-->
+        <context:component-scan base-package="com.kicc.service"/>
+    ```
+
+3. 业务类注册spring
+
+    ```xml
+    <!--2. 将所有业务类注入到Spring，通过配置或者注解-->
+    <bean id="BookServiceImpl" class="com.kicc.service.BookServiceImpl">
+        <property name="bookMapper" ref="bookMapper"/>
+    </bean>
+    ```
+
+    如果这里不写<property name="bookMapper" ref="bookMapper"/>， 就需要在BookService.java 中@Autowired注入bookMapper。
+
+    注意：@Autowired不是说不需要写 <bean id =""> 而是不需要 写 <property>了。而Mapper层是用了接口扫描包，所以没有为Mapper 写bean。
+
+4. 添加事务
+
+    ```xml
+    <!--3. 事务配置-->
+    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <!--注入数据源-->
+        <property name="dataSource" ref="dataSource"/>
+    </bean>
+    ```
+
+5. AOP织入事务
+
+    ```xml
+    <!--结合AOP，实现事务的织入-->
+    <!--配置事务通知-->
+    <tx:advice id="txAdvice" transaction-manager="transactionManager">
+        <!--给哪些方法 配置事务-->
+        <!--配置事务的传播特性： new propagation =-->
+        <tx:attributes>
+            <tx:method name="add" propagation="REQUIRED"/>
+            <tx:method name="delete" propagation="REQUIRED"/>
+            <tx:method name="update" propagation="REQUIRED"/>
+            <tx:method name="query" propagation="REQUIRED"/>
+        </tx:attributes>
+    </tx:advice>
+    
+    <!--配置事务切入-->
+    <aop:config>
+        <aop:pointcut id="txPointCut" expression="execution(* com.kicc.mapper.BookMapper.*(..))"/>
+        <aop:advisor advice-ref="txAdvice" pointcut-ref="txPointCut"/>
+    </aop:config>
+    ```
+
+### 10.3.2 Java service层
+
+1. 创建Service接口
+
+    ```java
+    public interface BookService {
+    
+        /**
+         *
+         * @param book
+         * @return
+         */
+        int addBook(Books book);
+    
+    
+        /**
+         * 根据id删除一个Book
+         * @param id
+         * @return
+         */
+        int deleteBookById(int id);
+    
+        /**
+         * 更新Book
+         * @param books
+         * @return
+         */
+        int updateBook(Books books);
+    
+        /**
+         * 根据id查询,返回一个Book
+         * @param id
+         * @return
+         */
+        Books queryBookById(int id);
+    
+        /**
+         * 查询全部Book,返回list集合
+         * @return
+         */
+        List<Books> queryAllBook();
+    
+    }
+    ```
+
+2. 实现类
+
+    ```java
+    public class BookServiceImpl implements BookService {
+        private BookMapper bookMapper;
+    
+        public void setBookMapper(BookMapper bookMapper) {
+            this.bookMapper = bookMapper;
+        }
+    
+        public int addBook(Books book) {
+            return bookMapper.addBook(book);
+        }
+    
+        public int deleteBookById(int id) {
+            return bookMapper.deleteBookById(id);
+        }
+    
+        public int updateBook(Books books) {
+            return bookMapper.updateBook(books);
+        }
+    
+        public Books queryBookById(int id) {
+            return bookMapper.queryBookById(id);
+        }
+    
+        public List<Books> queryAllBook() {
+            return bookMapper.queryAllBook();
+        }
+    }
+    ```
+
+    
+
+
+
+## 10.4 controller 层
+
+### 10.4.1 配置springMVC
+
+1. 将项目配置为Web项目
+
+2. web.xml配置
+
+    ```xml
+    <?xml version="1.0" encoding="UTF-8"?>
+    <web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_4_0.xsd"
+             version="4.0">
+        
+        <servlet>
+            <servlet-name>springmvc</servlet-name>
+            <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+    
+            <init-param>
+                <param-name>contextConfigLocation</param-name>
+                <param-value>classpath:spring-mvc.xml</param-value>
+            </init-param>
+    
+            <load-on-startup>1</load-on-startup>
+        </servlet>
+    
+    
+        <servlet-mapping>
+            <servlet-name>springmvc</servlet-name>
+            <url-pattern>/</url-pattern>
+        </servlet-mapping>
+    
+        <!--乱码过滤-->
+        <filter>
+            <filter-name>encodingFilter</filter-name>
+            <filter-class>org.springframework.web.filter.CharacterEncodingFilter</filter-class>
+            <init-param>
+                <param-name>encoding</param-name>
+                <param-value>utf-8</param-value>
+            </init-param>
+        </filter>
+    
+        <filter-mapping>
+            <filter-name>encodingFilter</filter-name>
+            <url-pattern>/*</url-pattern>
+        </filter-mapping>
+    
+        <!--Session Config-->
+        <session-config>
+            <session-timeout>15</session-timeout>
+        </session-config>
+    
+    </web-app>
+    ```
+
+    - DispatcherServlet
+    - init-param
+    - 乱码过滤
+    - 超时设置
+
+3. 配置spring-mvx.xml
+
+    ```xml
+    <!--1.注解驱动-->
+    <mvc:annotation-driven/>
+    <!--2.静态资源过滤-->
+    <mvc:default-servlet-handler/>
+    <!--扫描包：controller-->
+    <context:component-scan base-package="com.kicc.controller"/>
+    
+    <!--视图解析器-->
+    <bean class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+        <property name="viewClass" value="org.springframework.web.servlet.view.JstlView" />
+        <property name="prefix" value="/WEB-INF/jsp/"/>
+        <property name="suffix" value=".jsp"/>
+    </bean>
+    ```
+
+4. 编写Controller层
+
+    ```java
+    @Controller
+    @RequestMapping("/book")
+    public class BookController {
+        // controller 调用 service
+    
+        @Autowired
+        @Qualifier("BookServiceImpl")
+        private BookService bookService;
+    
+    
+        // 查询所有书籍 并在jsp中展示
+        @RequestMapping("/allBook")
+        public String list(Model model) {
+            List<Books> books = bookService.queryAllBook();
+            model.addAttribute("list", books);
+    
+            return "allBook";
+        }
+    }
+    ```
+
+    具体的业务代码就再说了。
