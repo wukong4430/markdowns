@@ -169,7 +169,7 @@ public @interface SpringBootConfiguration {
 
 
 
-> ## @EnableAutoconfiguration
+> ## @EnableAutoConfiguration
 
 这个注解负责：**开启自动配置功能**。
 
@@ -207,9 +207,565 @@ public @interface EnableAutoConfiguration {
 
 
 
+```Java
+@Import(AutoConfigurationPackages.Registrar.class)
+public @interface AutoConfigurationPackage {
+}
+```
+
+@Import: Spring底层注解。给容器中导入一个组件；
+
+AutoConfigurationPackages.Registrar.class： 将主启动类的所在包以及包下面所有子包里面的组件扫描的Spring容器中；
+
+
+
+> @Import(AutoConfigurationImportSelector.class) : 给容器导入组件；
+
+
+
+AutoConfigurationImportSelector：自动配置导入选择器，那么它会导入哪些组件的选择器呢？我们点击去这个类看源码：
+
+1、这个类中有一个这样的方法
+
+ getCandidateConfigurations
+
+```java
+/** 获得候选的配置
+*/
+protected List<String> getCandidateConfigurations(AnnotationMetadata metadata, AnnotationAttributes attributes) {
+   List<String> configurations = SpringFactoriesLoader.loadFactoryNames(getSpringFactoriesLoaderFactoryClass(),
+         getBeanClassLoader());
+   Assert.notEmpty(configurations, "No auto configuration classes found in META-INF/spring.factories. If you "
+         + "are using a custom packaging, make sure that file is correct.");
+   return configurations;
+}
+```
+
+2、这个方法又调用了  SpringFactoriesLoader 类的静态方法！我们进入SpringFactoriesLoader类loadFactoryNames() 方法
+
+
+
+再往下追溯，可以发现
+
+```java
+public static List<String> loadFactoryNames(Class<?> factoryType, @Nullable ClassLoader classLoader) {
+    String factoryTypeName = factoryType.getName();
+    return (List)loadSpringFactories(classLoader).getOrDefault(factoryTypeName, Collections.emptyList());
+}
+
+private static Map<String, List<String>> loadSpringFactories(@Nullable ClassLoader classLoader) {
+...
+}
+```
+
+> 在loadSpringFactories方法中，多次出现了一个文件：**"META-INF/spring.factories"**,这个就是我们需要的spring配置工厂。
+
+![image-20200628141434301](SpringBoot.assets/image-20200628141434301.png)
 
 
 
 
-## 2.4 配置
 
+## 2.4 spring.factories 配置
+
+在这个文件中，保存了大量的AutoConfiguration类。这些都是JavaConfig类。（代替Spring中的xml）
+
+随便打开一个查看源码：**WebMvcAutoConfiguration**
+
+![image-20200628141723281](SpringBoot.assets/image-20200628141723281.png)
+
+所以，
+
+- 自动配置真正实现是从classpath中搜寻所有的META-INF/spring.factories配置文件 ，
+- 并将其中对应的 org.springframework.boot.autoconfigure. 包下的配置项，通过反射实例化为对应标注了 @Configuration的JavaConfig形式的IOC容器配置类 ， 
+- 然后将这些都汇总成为一个实例并加载到IOC容器中。
+
+**需要注意的是：**
+
+spirng.factories中的这么多配置并不会全部生效，因为有注解@ConditionalOnClass，只要在条件合适的情况下**(导入了对应的starter）**才能生效!
+
+
+
+## 2.5 Run 方法
+
+>  SpringApplication
+
+**这个类主要做了以下四件事情：**(重要)
+
+1、推断应用的类型是普通的项目还是Web项目
+
+2、查找并加载所有可用初始化器 ， 设置到initializers属性中
+
+3、找出所有的应用程序监听器，设置到listeners属性中
+
+4、推断并设置main方法的定义类，找到运行的主类
+
+![img](SpringBoot.assets/640.jpg)
+
+
+
+
+
+# 3 Application.properties 配置
+
+## 3.1 外部配置的优先级 （随着版本更新 可能会变化 目前是2.1.6）
+
+1. [Devtools global settings properties](https://docs.spring.io/spring-boot/docs/2.1.6.RELEASE/reference/html/using-boot-devtools.html#using-boot-devtools-globalsettings) on your home directory (`~/.spring-boot-devtools.properties` when devtools is active).
+2. [`@TestPropertySource`](https://docs.spring.io/spring/docs/5.1.8.RELEASE/javadoc-api/org/springframework/test/context/TestPropertySource.html) annotations on your tests.
+3. `properties` attribute on your tests. Available on [`@SpringBootTest`](https://docs.spring.io/spring-boot/docs/2.1.6.RELEASE/api/org/springframework/boot/test/context/SpringBootTest.html) and the [test annotations for testing a particular slice of your application](https://docs.spring.io/spring-boot/docs/2.1.6.RELEASE/reference/html/boot-features-testing.html#boot-features-testing-spring-boot-applications-testing-autoconfigured-tests).
+4. Command line arguments.
+5. Properties from `SPRING_APPLICATION_JSON` (inline JSON embedded in an environment variable or system property).
+6. `ServletConfig` init parameters.
+7. `ServletContext` init parameters.
+8. JNDI attributes from `java:comp/env`.
+9. Java System properties (`System.getProperties()`).
+10. OS environment variables.
+11. A `RandomValuePropertySource` that has properties only in `random.*`.
+12. [Profile-specific application properties](https://docs.spring.io/spring-boot/docs/2.1.6.RELEASE/reference/html/boot-features-external-config.html#boot-features-external-config-profile-specific-properties) outside of your packaged jar (`application-{profile}.properties` and YAML variants).
+13. [Profile-specific application properties](https://docs.spring.io/spring-boot/docs/2.1.6.RELEASE/reference/html/boot-features-external-config.html#boot-features-external-config-profile-specific-properties) packaged inside your jar (`application-{profile}.properties` and YAML variants).
+14. Application properties outside of your packaged jar (`application.properties` and YAML variants).
+15. Application properties packaged inside your jar (`application.properties` and YAML variants).
+16. [`@PropertySource`](https://docs.spring.io/spring/docs/5.1.8.RELEASE/javadoc-api/org/springframework/context/annotation/PropertySource.html) annotations on your `@Configuration` classes.
+17. Default properties (specified by setting `SpringApplication.setDefaultProperties`).
+
+
+
+## 3.2 application.yaml 配置 （建议）
+
+POJO:
+
+```java
+public class Person {
+
+    private String name;
+    private List<String> hobbys;
+    private int age;
+    private String sex;
+    private Dog dog;
+    private String location;
+    private Map<String, Object> maps;
+```
+
+```java
+public class Dog {
+
+    private String name;
+    private int age;
+```
+
+
+
+application.yaml
+
+```yaml
+person:
+  name: Kaige
+  hobbys:
+    - code
+    - soccer
+    - swim
+  age: 23
+  sex: male
+  location: NB
+  maps: {k1: v1, k2: v2}
+  dog:
+    name: 小黑
+    age: 3
+```
+
+ 
+
+Then 添加注解
+
+```java
+@Component
+@ConfigurationProperties(prefix = "person")
+public class Person {
+
+    private String name;
+    private List<String> hobbys;
+    private int age;
+    private String sex;
+    private Dog dog;
+    private String location;
+    private Map<String, Object> maps;
+```
+
+这样就能直接注入属性了！
+
+
+
+同时，yaml还支持需要 ${} 占位符操作。比如 ${random.int} ${random.uuid}。可以在配置文件中完成这部分代码，就可以减少不必要的代码。
+
+
+
+```yaml
+debug: true # 用于查看哪些类生效，哪些不生效！
+```
+
+
+
+
+
+
+
+## 3.3 与spring.factories的联系
+
+首先，spring.factories下的XxxAutoConfiguration类都有注解 @Configuration。表示这个是个配置类！
+
+举例，![image-20200629141403138](SpringBoot.assets/image-20200629141403138.png)
+
+展开
+
+![image-20200629141417065](SpringBoot.assets/image-20200629141417065.png)
+
+- @Configuration：表示这是一个配置类
+- @EnableConfigurationProperties：
+    - ServierProperties：![image-20200629141658648](SpringBoot.assets/image-20200629141658648.png)
+    - 带有一个@ConfigurationProperties注解，表明能从.yaml中取配置。字段：port、address等就是application.yaml中可以配置的属性！
+    - ![image-20200629141922621](SpringBoot.assets/image-20200629141922621.png)
+- @ContionalOnWebApplication：Spring的底层注解：根据不同的条件将某个Bean加载到应用上下文中。
+
+
+
+
+
+
+
+## 3.4 ConditionalOnXxx
+
+
+
+| @ConditionalOnProperty          | application.properties 或 application.yml 文件中 mybean.enable 为 true 才会加载 MyCondition 这个 Bean，如果没有匹配上也会加载，因为 matchIfMissing = true，默认值是 false。 |
+| ------------------------------- | ------------------------------------------------------------ |
+| **@ConditionalOnBean**          | 某个（另外的）Bean存在时加载                                 |
+| **ConditionalOnMissingBean**    | 某个（另外的）Bean不存在时加载                               |
+| @ConditionalOnClass             | 某个（另外的）类存在与classpath中加载                        |
+| @ConditionalOnMissingClass      | 某个（另外的）类不存在与classpath中加载                      |
+| @ConditionalOnExpression        | 多个复杂属性判断                                             |
+| @ConditionalOnSingleCandidate   |                                                              |
+| @ConditionalOnResource          | bean依赖的资源存在，比如logback.xml                          |
+| @ConditionalOnJndi              | 只有指定的资源通过 JNDI 加载后才加载 bean                    |
+| @ConditionalOnJava              | 只有运行指定版本的 Java 才会加载 Bean                        |
+| @ConditionalOnWebApplication    | 只有运行在 web 应用里才会加载这个 bean                       |
+| @ConditionalOnNotWebApplication |                                                              |
+| @ConditionalOnCloudPlatform     | 特定的云平台下运行                                           |
+
+
+
+## 3.5 自动装配的原理! （重点）
+
+1. SpringBoot启动会加载大量的自动配置类。；
+2. 查看需要的功能是否有在SpringBoot中默认写好的自动配置类中；
+3. 再看自动配置类中到底配置了哪些组件；（只要我们需要的组件存在其中，我们就不需要再手动配置了）
+4. 给容器中自动配置类添加组件的时候，会从properties类中获取某些属性。我们只需要再配置文件中指定这些属性的值即可；
+    1. xxxAutoConfiguration：自动配置类；给容器添加组件
+    2. xxxProperties：封装配置文件中的相关属性；
+    3. 2 和 **application.yaml**的属性值相互对应。
+
+
+
+
+
+
+
+# 4 JRS 303 校验
+
+在Java类上添加注解 @Validated； 在需要校验的字段上添加 注解。
+
+```java
+@Component //注册bean
+@ConfigurationProperties(prefix = "person")
+@Validated  //数据校验
+public class Person {
+    @Email(message="邮箱格式错误") //name必须是邮箱格式    
+    private String name;}
+```
+
+
+
+## 4.1 常用参数
+
+```yaml
+
+@NotNull(message="名字不能为空")
+private String userName;
+@Max(value=120,message="年龄最大不能查过120")
+private int age;
+@Email(message="邮箱格式错误")
+private String email;
+
+空检查
+@Null       验证对象是否为null
+@NotNull    验证对象是否不为null, 无法查检长度为1的字符串
+@NotBlank   检查约束字符串是不是Null还有被Trim的长度是否大于0,只对字符串,且会去掉前后空格.
+@NotEmpty   检查约束元素是否为NULL或者是EMPTY.
+    
+Booelan检查
+@AssertTrue     验证 Boolean 对象是否为 true  
+@AssertFalse    验证 Boolean 对象是否为 false  
+    
+长度检查
+@Size(min=, max=) 验证对象（Array,Collection,Map,String）长度是否在给定的范围之内  
+@Length(min=, max=) string is between min and max included.
+
+日期检查
+@Past       验证 Date 和 Calendar 对象是否在当前时间之前  
+@Future     验证 Date 和 Calendar 对象是否在当前时间之后  
+@Pattern    验证 String 对象是否符合正则表达式的规则
+```
+
+
+
+
+
+# 5 多环境切换
+
+同一个application.yaml可以被放在多个不同的位置：
+
+```xml
+file:./config/   		根目录下的config文件夹  				优先级1
+file:./			 		根目录									优先级2
+classpath:/config/		resources 下的config目录				优先级3
+classpath:/				resources目录							优先级4
+```
+
+环境的切换可以通过优先级高覆盖的方式进行。
+
+
+
+```yaml
+# 默认配置
+server:
+  port: 8081
+spring:
+# 选择 哪个环境
+  profiles:
+    active: dev
+
+# 用---分割
+---
+server:
+  port: 8082
+spring:
+  profiles: dev
+---
+server:
+  port: 8083
+
+spring:
+  profiles: test
+```
+
+
+
+# 6 SpringBoot Web开发
+
+
+
+## 6.1静态资源
+
+WebMvcAutoConfiguration.java中：
+
+```java
+@Override
+public void addResourceHandlers(ResourceHandlerRegistry registry) {
+   if (!this.resourceProperties.isAddMappings()) {
+      logger.debug("Default resource handling disabled");
+      return;
+   }
+   Duration cachePeriod = this.resourceProperties.getCache().getPeriod();
+   CacheControl cacheControl = this.resourceProperties.getCache().getCachecontrol().toHttpCacheControl();
+   if (!registry.hasMappingForPattern("/webjars/**")) {
+      customizeResourceHandlerRegistration(registry.addResourceHandler("/webjars/**")
+            .addResourceLocations("classpath:/META-INF/resources/webjars/")
+            .setCachePeriod(getSeconds(cachePeriod)).setCacheControl(cacheControl));
+   }
+   String staticPathPattern = this.mvcProperties.getStaticPathPattern();
+   if (!registry.hasMappingForPattern(staticPathPattern)) {
+      customizeResourceHandlerRegistration(registry.addResourceHandler(staticPathPattern)
+            .addResourceLocations(getResourceLocations(this.resourceProperties.getStaticLocations()))
+            .setCachePeriod(getSeconds(cachePeriod)).setCacheControl(cacheControl));
+   }
+}
+```
+
+
+
+> 1. webjars方式
+
+涉及到一个webjars:
+
+打开webjars官网 https://www.webjars.org/，可以通过maven的方式导入依赖。比如导入一个jquery，我们就能在jquery的jar包下找到   
+
+```xml
+ META-INF/resources/webjars/...
+```
+
+这样，在开启服务后，我们通过访问
+
+```
+localhost:8080/webjars/jquery/0.0.0/jquery.js
+```
+
+实现静态资源的访问。
+
+
+
+> 2. properties方式
+
+![image-20200629154146382](SpringBoot.assets/image-20200629154146382.png)
+
+通过getStaticLocations()：
+
+![image-20200629154355376](SpringBoot.assets/image-20200629154355376.png)
+
+可以看到，总共有四种路径，都支持静态资源的访问。（classpath：指的就是resources目录）
+
+同时，这几个路径有优先级区别。 resources > static > public 。
+
+> > 通常来说，会在public下放公共的js，static放一些图片资源，resources：upload上传的文件。
+
+
+
+> 3. 如果在application.yaml中定义了pattern路径，那么这个优先级是最高的。前面说的webjars和四种路径都失效了！
+
+![image-20200629154819267](SpringBoot.assets/image-20200629154819267.png)
+
+![image-20200629155410186](SpringBoot.assets/image-20200629155410186.png)
+
+在.yaml设置为false就无法通过 1 和 2 的方式访问静态资源了。
+
+> > 默认的staticPathPattern = "/**"
+
+![image-20200629155714649](SpringBoot.assets/image-20200629155714649.png)
+
+在类
+
+![image-20200629155735732](SpringBoot.assets/image-20200629155735732.png)
+
+下，所以可以在yaml中配置：
+
+![image-20200629160613223](SpringBoot.assets/image-20200629160613223.png)
+
+现在，所有的静态资源都通过 **/heeelo** 访问。
+
+注意：不是说静态资源放在了 classpath: heeelo下，而是必须先通过 localhost:8080/heeelo/ 来访问静态资源。依然是原本的  resources > static >  public 的优先级顺序。
+
+> > 设置静态资源位置
+> >
+> > spring.resources.static-locations
+
+修改静态资源访问路径：
+
+![image-20200629161135782](SpringBoot.assets/image-20200629161135782.png)
+
+现在 可以访问heeelo目录下的静态资源了！ 而且优先级比resources还要高！
+
+> 总结
+
+**“spring.mvc.static-path-pattern”用于阐述HTTP请求地址，而“spring.resources.static-locations”则用于描述静态资源的存放位置。**
+
+
+
+
+
+## 6.2 首页的定制
+
+```java
+WebMvcAutoConfiguration.java:
+```
+
+![image-20200629162054648](SpringBoot.assets/image-20200629162054648.png)
+
+
+
+index.html可以放在任意静态资源目录下。但是不能放在template下直接访问。
+
+>  在template目录下的所有页面，只能通过controller来跳转!
+>
+>  同时，需要模板引擎的支持。thymeleaf
+
+
+
+
+
+# 7 模板引擎 Thymeleaf
+
+导入Thymeleaf 3.x依赖：
+
+```xml
+<!--Thymeleaf 3.x。 不要用2.x-->
+<dependency>
+    <groupId>org.thymeleaf</groupId>
+    <artifactId>thymeleaf-spring5</artifactId>
+</dependency>
+
+<dependency>
+    <groupId>org.thymeleaf.extras</groupId>
+    <artifactId>thymeleaf-extras-java8time</artifactId>
+</dependency>
+```
+
+
+
+把html放在template下，通过controller跳转视图。
+
+
+
+- 取值操作：
+
+```xml
+${value}
+```
+
+- 遍历
+
+```java
+model.addAttribute("users", Arrays.asList("user1", "user2"));
+```
+
+```html
+<h5 th:each="user:${users}" th:text="${user}"></h5>
+```
+
+
+
+>  基础 语法 
+
+- Simple expressions:
+    - Variable Expressions: `${...}`
+    - Selection Variable Expressions: `*{...}`
+    - Message Expressions: `#{...}`
+    - Link URL Expressions: `@{...}`
+    - Fragment Expressions: `~{...}`
+- Literals
+    - Text literals: `'one text'`, `'Another one!'`,…
+    - Number literals: `0`, `34`, `3.0`, `12.3`,…
+    - Boolean literals: `true`, `false`
+    - Null literal: `null`
+    - Literal tokens: `one`, `sometext`, `main`,…
+- Text operations:
+    - String concatenation: `+`
+    - Literal substitutions: `|The name is ${name}|`
+- Arithmetic operations:
+    - Binary operators: `+`, `-`, `*`, `/`, `%`
+    - Minus sign (unary operator): `-`
+- Boolean operations:
+    - Binary operators: `and`, `or`
+    - Boolean negation (unary operator): `!`, `not`
+- Comparisons and equality:
+    - Comparators: `>`, `<`, `>=`, `<=` (`gt`, `lt`, `ge`, `le`)
+    - Equality operators: `==`, `!=` (`eq`, `ne`)
+- Conditional operators: **（三元运算符，前端专用）**
+    - If-then: `(if) ? (then)`
+    - If-then-else: `(if) ? (then) : (else)`
+    - Default: `(value) ?: (defaultvalue)`
+- Special tokens:
+    - No-Operation: `_`
+
+All these features can be combined and nested:
+
+```html
+'User is of type ' + (${user.isAdmin()} ? 'Administrator' : (${user.type} ?: 'Unknown'))
+```

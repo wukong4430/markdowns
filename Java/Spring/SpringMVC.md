@@ -1501,3 +1501,30 @@ pom.xml文件：
     ```
 
     具体的业务代码就再说了。
+
+
+
+
+
+
+
+
+
+# 11 Ajax
+
+>  异步的Js和Xml：不需要刷新整个网页的情况下进行局部的刷新！
+
+
+
+JQuery是Js的是个库，集成了大量Javascript的方法。
+
+
+
+下载jquery.js 保存到 WEB-INF/static/js。
+
+目标：实现类似 Baidu 首页的焦点请求。
+
+
+
+
+
