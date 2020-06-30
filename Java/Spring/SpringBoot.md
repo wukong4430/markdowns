@@ -85,7 +85,8 @@
 
 ```java
 //@SpringBootApplication ： 标注这个类是一个springboot的应用
-@SpringBootApplication
+// same as @Configuration @EnableAutoConfiguration @ComponentScan
+@SpringBootApplication 
 public class Springboot01HelloApplication {
 
     public static void main(String[] args) {
@@ -128,6 +129,40 @@ public @interface SpringBootApplication {
     // ......
 }
  ```
+
+
+
+> A single `@SpringBootApplication` annotation can be used to enable those three features, that is:
+>
+> - `@EnableAutoConfiguration`: enable [Spring Boot’s auto-configuration mechanism](https://docs.spring.io/spring-boot/docs/2.3.0.RELEASE/reference/html/using-spring-boot.html#using-boot-auto-configuration)
+> - `@ComponentScan`: enable `@Component` scan on the package where the application is located (see [the best practices](https://docs.spring.io/spring-boot/docs/2.3.0.RELEASE/reference/html/using-spring-boot.html#using-boot-structuring-your-code))
+> - `@Configuration`: allow to register extra beans in the context or import additional configuration classes
+
+
+
+如果不想使用@SpringBootApplication注解 （一次性使用三个功能太多了）， 那么可以分开使用：
+
+```java
+package com.example.myapplication;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.context.annotation.ComponentScan
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+
+@Configuration(proxyBeanMethods = false)
+@EnableAutoConfiguration
+@Import({ MyConfig.class, MyAnotherConfig.class })
+public class Application {
+
+    public static void main(String[] args) {
+            SpringApplication.run(Application.class, args);
+    }
+
+}
+```
+
+这里，就不直接使用@ComponentScan注解，而是换成了 @Import， 来显式的导入我们需要的组件！
 
 
 
@@ -769,3 +804,367 @@ All these features can be combined and nested:
 ```html
 'User is of type ' + (${user.isAdmin()} ? 'Administrator' : (${user.type} ?: 'Unknown'))
 ```
+
+
+
+
+
+
+
+# 8 MVC 配置原理
+
+> If you want to keep those Spring Boot MVC customizations and make more [MVC customizations](https://docs.spring.io/spring/docs/5.2.6.RELEASE/spring-framework-reference/web.html#mvc) (interceptors, formatters, view controllers, and other features), you can add your own `@Configuration` class of type `WebMvcConfigurer` but **without** `@EnableWebMvc`.
+
+默认原有MVC自动配置：
+
+![image-20200630122114683](SpringBoot.assets/image-20200630122114683.png)
+
+如果想定义一个自己的视图解析器：
+
+```java
+@Controller
+public class MyMvcConfig implements WebMvcConfigurer {
+
+    @Bean
+    public ViewResolver myViewResolver() {
+        return new MyViewResolver();
+    }
+
+    public static class MyViewResolver implements ViewResolver {
+        @Override
+        public View resolveViewName(String viewName, Locale locale) throws Exception {
+            return null;
+        }
+    }
+}
+```
+
+按照上面的描述：编写一个类，继承 WebMvcConfigurer，增加<font color='orange'>@Configuration</font>注解。
+
+
+
+**But without @EnableWebMvc：**
+
+添加了这个注解之后，默认的  WebMVCAutoConfiguration就全部失效了。
+
+> 原因：
+>
+> @EnableWebMvc 导入了DelegatingWebMvcConfiguration
+>
+> DelegatingWebMvcConfiguration 继承了 WebMvcConfigurationSupport
+
+![image-20200630125256638](SpringBoot.assets/image-20200630125256638.png)
+
+如果存在WebMvcConfigurationSupport，那么整个WebMvcAutoConfiguration就会失效。
+
+
+
+
+
+# 9 Web 开发
+
+前端引入thymeleaf依赖：
+
+```html
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+```
+
+
+
+## 9.1 国际化
+
+1. 配置 i18n文件
+
+![image-20200630163854274](SpringBoot.assets/image-20200630163854274.png)
+
+- 创建对应语言的properties文件，定义需要使用不同语言前端文本的字段（多语言）
+
+- 在.html页面中配置 
+
+    ![image-20200630165321693](SpringBoot.assets/image-20200630165321693.png)
+
+2. 国际化文件配置
+
+    这里涉及到SpringBoot对国际化的自动配置! 有一个类:<font color='cornflowerblue'>MessageSourceAutoConfiguration</font>.
+
+    有属性spring.messages.basename = "messages"。设置成我们的路径：
+
+    ![image-20200630170025167](SpringBoot.assets/image-20200630170025167.png)
+
+3. 自定义 LocaleResolver 组件
+
+    ```java
+    public class MyLocaleResolver implements LocaleResolver {
+    
+    
+        @Override
+        public Locale resolveLocale(HttpServletRequest request) {
+            // 接受来自前端的参数, lang = "zh_CN"
+            String language = request.getParameter("lang");
+    
+            Locale locale = Locale.getDefault();
+    
+            if (!StringUtils.isEmpty(language)) {
+                String[] s = language.split("_");
+    
+                locale = new Locale(s[0], s[1]);
+            }
+    
+            return locale;
+        }
+    
+        @Override
+        public void setLocale(HttpServletRequest request, HttpServletResponse response, Locale locale) {
+    
+        }
+    }
+    ```
+
+    - 在Spring中有一个国际化的Locale （区域信息对象）；里面有一个叫做LocaleResolver （获取区域信息对象）的解析器！
+
+    ![image-20200630170407562](SpringBoot.assets/image-20200630170407562.png)
+
+    看到默认里，初始化了AcceptHeaderLocaleResolver，实现了LocaleResolver。那我们也跟着这个来实现一个自己的 LocaleResovler。
+
+4. 将自定义类注册到Spring容器：@Bean
+
+    ```java
+    @Configuration
+    public class MyMvcConfig implements WebMvcConfigurer {
+    
+        @Bean
+        public LocaleResolver localeResolver() {
+            return new MyLocaleResolver();
+        }
+    }
+    ```
+
+    
+
+5. 前端编写跳转方式
+
+    ```html
+    <a class="btn btn-sm" th:href="@{/index.html(lang=zh_CN)}">中文</a>
+    <a class="btn btn-sm" th:href="@{/index.html(lang=en_US)}">English</a>
+    ```
+
+    跳转到index.html页面并附带参数，这个参数被MyLocaleResovler截获。
+
+    
+
+## 9.2 页面与Controller的交互
+
+完成登录：
+
+- 成功登录，跳转到dashboard
+- 登录失败，提示用户名密码错误
+
+> 1、前端表单
+
+![image-20200630203913060](SpringBoot.assets/image-20200630203913060.png)
+
+
+
+查看表单、按钮。添加
+
+```html
+<form class="form-signin" th:action="@{/user/login}">
+```
+
+点击登录后跳转的url： /usr/login。
+
+
+
+> 2、后端controller
+
+添加 Logincontroller：
+
+```java
+@Controller
+public class LoginController {
+
+    @RequestMapping("/user/login")
+    public String login(@RequestParam("username") String username,
+                        @RequestParam("password") String password,
+                        Model model) {
+        if (!StringUtils.isEmpty(username) && "123456".equals(password)) {
+            return "dashboard";
+        } else {
+            // 登陆失败
+            model.addAttribute("msg", "用户名或者密码错误！");
+            return "index";
+        }
+    }
+
+}
+```
+
+路由为刚才设置的 /usr/login，执行 login() 方法。 参数为从form接收的 username 和 password。继续回前端设置
+
+
+
+> 3、前端参数传递
+
+```html
+<input type="text" name="username" class="form-control" required="" autofocus="" th:placeholder="#{login.username}">
+
+<input type="password" name="password" class="form-control"  required="" th:placeholder="#{login.password}">
+```
+
+必须在 <input> 设置name，传递参数！
+
+登录成功可以跳转到dashboard视图，登录失败则需要返回index视图，同时携带msg消息。
+
+**如何显示这个msg？**
+
+在 index.html页面 增加 消息的显示
+
+```html
+<p style="color: #ff0000" th:text="${msg}" th:if="${not #strings.isEmpty(msg)}"></p>
+```
+
+定义显示msg的条件：msg需要不为空，说明是尝试过登录的。
+
+thymeleaf的条件判断语法：
+
+- If-then: `(if) ? (then)`
+- If-then-else: `(if) ? (then) : (else)`
+- Default: `(value) ?: (defaultvalue)`
+
+布尔运算符：
+
+- Binary operators: `and`, `or`
+- Boolean negation (unary operator): `!`, `not`
+
+#strings. 是thymeleaf的string工具类。
+
+```html
+th:if="${not #strings.isEmpty(msg)}"
+```
+
+
+
+> 问题1：dashboard-url栏中出现了 表单信息
+
+```html
+http://localhost:8080/user/login?username=2018202110061&password=123456
+```
+
+因为直接返回的  dashboard 视图，所以会把信息附带在url中。
+
+解决：<font color='orange'>加视图</font>
+
+```java
+    if (!StringUtils.isEmpty(username) && "123456".equals(password)) {
+        return "redirect:/main.html";
+    } else {
+        // 登陆失败
+        model.addAttribute("msg", "用户名或者密码错误！");
+        return "index";
+    }
+}
+```
+
+将成功登录重定向到 main.html
+
+同时在 自定义 MVC Config中添加视图：
+
+![image-20200630205543224](SpringBoot.assets/image-20200630205543224.png)
+
+这里的main.html可以用任意的字符串代替，取main也可以，甚至可以取dashboard。只要Controller和Configuration两者相互对应就可以。
+
+
+
+> 问题2：直接在地址栏输入main.html也可以到dashboard
+
+在Configuration中增加了视图控制后，现在不需要正确登录也能直接到dashboard.html页面了。
+
+解决办法：<font color='orange'>加拦截器</font>
+
+自定义拦截器： LoginHandlerInterceptor 实现 HandlerInterceptor接口
+
+重写方法
+
+```java
+public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+
+	// 进行逻辑判断，如果ok就返回true，不行就返回false，返回false就不会处理请求
+    return false;
+}
+```
+
+**思考：如果登录成功会怎么样？**
+
+> > 会有session！
+
+所以只要request.getSession()能获取到session就可以了！<font color='red'>因此我们需要在登录成功的时候添加session。</font>
+
+![image-20200630212608482](SpringBoot.assets/image-20200630212608482.png)
+
+```html
+session = <"loginUser", username>
+```
+
+- 编写拦截器:
+
+```java
+public class LoginHandlerInterceptor implements HandlerInterceptor {
+
+
+    /**
+     * 进行逻辑判断，如果ok就返回true，不行就返回false，返回false就不会处理请求
+     * @param request
+     * @param response
+     * @param handler
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+
+
+        Object loginUser = request.getSession().getAttribute("loginUser");
+
+        if (loginUser==null) {
+            request.setAttribute("msg", "请先登录！");
+            request.getRequestDispatcher("/index.html").forward(request, response);
+            return false;
+        } else {
+            return true;
+        }
+    }
+```
+
+通过request.getSession().getAttribute() 获得对应的session，如果session存在，则返回true；否则跳转到index页面，并带一个msg消息！
+
+
+
+- 配置拦截器
+
+同样在自定义Configuration中，重写 addInterceptors 方法
+
+![image-20200630213017642](SpringBoot.assets/image-20200630213017642.png)
+
+1. 添加拦截器
+2. 添加拦截的路径
+3. 排除不需要拦截的资源、路径
+    - /index.html   /
+    - /user/login
+    - 静态资源文件
+
+效果如下：
+
+![image-20200630213148718](SpringBoot.assets/image-20200630213148718.png)
+
+> 回顾Spring中，request.getRequestDispatcher
+
+- Web应用是  请求\响应 架构， 而request和response就是在服务器端生成的相应的两个对象，request能够获取客户端传递的参数以及相关的一些信息，而response就是给客户端相关的页面信息。
+
+- request.getRequestDispatcher.forward(request.response) 表示将客户端的请求转向（forward）到getRequestDispatcher（）方法中参数定义的页面或者链接。
+
+- ```
+    说通俗点就是，当一个客户端的请求到这个页面后，不做处理或者不处理完，将请求转给另一个页面处理，然后再响应给客户端。
+    ```
+
+
+

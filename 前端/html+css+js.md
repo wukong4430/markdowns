@@ -84,3 +84,216 @@ qq链接：
 <a target="_blank" href="http://wpa.qq.com/msgrd?v=3&uin=&site=qq&menu=yes"><img border="0" src="http://wpa.qq.com/pa?p=2::53" alt="给我发消息把！" title="给我发消息把！"/></a>
 ```
 
+> 列表
+
+1. 有序列表
+
+```html
+<ol>
+    <li>Java</li>
+    <li>Python</li>
+</ol>
+```
+
+2. 无序列表
+
+```html
+<ul>
+    <li>Java</li>
+    <li>Python</li>
+</ul>
+```
+
+3. 自定义列表
+
+```html
+<!-- 
+dl: 标签
+dt：列表名称	 
+dd：列表内容
+-->
+<dl>
+    <dt></dt>
+    
+    <dd>Java</dd>
+    <dd>Python</dd>
+</dl>
+```
+
+
+
+> 表格
+
+属性：
+
+- table
+- tr
+- td
+
+```html
+<table border="2px" >
+    <tr>
+        <td colspan="3">学生成绩</td>
+
+    </tr>
+    <tr>
+        <td rowspan="2">A</td>
+        <td>语文</td>
+        <td>100</td>
+    </tr>
+    <tr>
+        <td>数学</td>
+        <td>100</td>
+    </tr>
+    <tr>
+        <td rowspan="2">B</td>
+        <td>语文</td>
+        <td>100</td>
+    </tr>
+    <tr>
+        <td>数学</td>
+        <td>100</td>
+    </tr>
+</table>
+```
+
+![image-20200630100728627](html+css+js.assets/image-20200630100728627.png)
+
+> 媒体元素 （音频、视频）
+
+
+
+```html
+<video src="path" controls></video>
+
+<audio src="path" controls></audio>
+```
+
+
+
+> 页面结构
+
+```html
+<header>
+    <h2>网页头部</h2>
+</header>
+
+<nav>
+    <h2>导航</h2>
+</nav>
+
+<footer>
+    <h2>网页脚步</h2>
+</footer>
+
+<section>
+    <h2>网页主体</h2>
+</section>
+```
+
+
+
+> 网页内联嵌套
+
+```html
+<iframe src="https://www.baidu.com" name="hello" frameborder="0" width="1000px" height="500px">
+
+</iframe>
+
+
+<a href="first.html" target="hello">点击跳转</a>
+```
+
+首先展示了内联页面 hello：是百度的主页。 点击跳转后，内联页面跳转为first.html。
+
+> 表单
+
+```html
+<form method="post/get" action="表示向何处发送表单数据">
+    
+</form>
+```
+
+表单中的绝大多数控件都用 <input type="">；其中 submit， reset等不需要些名称，自动就是“提交”，“重置”。
+
+
+
+method：
+
+- get：直接显示到url中。（不安全）
+- post：不显示在url中。
+
+
+
+> input 属性
+
+![image-20200630215508850](html+css+js.assets/image-20200630215508850.png)
+
+- name：用于数据交互。
+- id：用户代码交互。
+- value：给元素赋值，如果是button类，就是按钮的名称。
+
+
+
+> 下拉框
+
+```html
+<p>国家：
+    <select name="select1">
+        <option value="China">中国</option>
+        <option value="USA">美国</option>
+        <option value="Germany">德国</option>
+        <option value="Switzerland" selected>瑞士</option>
+    </select>
+```
+
+
+
+> 单选框
+
+```html
+<p>性别：
+    <input type="radio" name="gender" value="1"/>男
+    <input type="radio" name="gender" value="0"/>女
+</p>
+```
+
+
+
+> 多选框
+
+```html
+<p>爱好：
+    <input type="checkbox" value="1" name="hobby"/>吃
+    <input type="checkbox" value="3" name="hobby"/>喝
+    <input type="checkbox" value="2" name="hobby" checked/>玩
+</p>
+```
+
+value是用来前后端交互传递参数的，name-value 可以认为是key-value。
+
+
+
+> 文本域 （多行）
+
+```html
+<p>
+    <textarea name="textarea" id="textArea1" cols="30" rows="10">
+        文本内容
+    </textarea>
+</p>
+```
+
+
+
+> 文件域
+
+```html
+<p>
+    <input type="file" name="files">
+    <input type="button" value="上传" name="upload">
+</p>
+```
+
+
+
