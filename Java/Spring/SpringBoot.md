@@ -1168,3 +1168,235 @@ public class LoginHandlerInterceptor implements HandlerInterceptor {
 
 
 
+
+
+## 9.1 查询 + 前端展示
+
+> dashboard.html 主要内容
+
+![image-20200701210935423](SpringBoot.assets/image-20200701210935423.png)
+
+包含：
+
+- 导航栏
+- 侧边栏
+- 内容显示区域
+
+
+
+> list.html 主要内容
+
+![image-20200701211039972](SpringBoot.assets/image-20200701211039972.png)
+
+包含：
+
+- 导航栏
+- 侧边栏
+- 内容显示区域
+
+
+
+两个页面除了内容显示区域不同之外，导航栏和侧边栏是一致的，因此代码冗余。提取出来到commoms。
+
+> thymeleaf 中的 th:fragment 和 th:insert / replace 用于模板
+
+创建 common/common.html
+
+- 导航栏
+
+![image-20200701211857740](SpringBoot.assets/image-20200701211857740.png)
+
+- 侧边栏
+
+![image-20200701211904555](SpringBoot.assets/image-20200701211904555.png)
+
+
+
+dashboard.html 和 list.html 中使用
+
+![image-20200701211952142](SpringBoot.assets/image-20200701211952142.png)
+
+
+
+> 问题：将list.html 按照如下目录防止后，list.html无法访问common.html
+
+![image-20200701223749688](SpringBoot.assets/image-20200701223749688.png)
+
+
+
+
+
+
+
+
+
+点击员工管理，高亮员工管理按钮，且返回所有员工的信息。
+
+1. 设置高亮 & 创建  路由跳转
+
+    ![image-20200701224120912](SpringBoot.assets/image-20200701224120912.png)
+
+2. EmployeeController
+
+    ```java
+    @Controller
+    public class EmployeeController {
+    
+    
+        @Autowired
+        private EmployeeDao employeeDao;
+    
+        @RequestMapping("/emps")
+        public String list(Model model) {
+    
+            Collection<Employee> employees = employeeDao.getAll();
+            model.addAttribute("emps", employees);
+    
+            return "emps/list";
+        }
+    }
+    ```
+
+3. 前端显示数据
+
+    ![image-20200701224251369](SpringBoot.assets/image-20200701224251369.png)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# X. 部署
+
+>  依赖管理：Maven
+
+
+
+> 开启防火墙端口 8080
+
+
+
+## X.1 jar 包部署 （默认）
+
+> 清理缓存 + 打包
+
+```bash
+mvn clean
+mvn package
+```
+
+得到xxxx.jar
+
+
+
+> 开启服务
+
+```bash
+nohup java -jar xxx.jar &
+```
+
+
+
+
+
+## X.2 war包部署
+
+
+
+> 修改pom.xml
+
+![image-20200701155516250](SpringBoot.assets/image-20200701155516250.png)
+
+
+
+![image-20200701155543223](SpringBoot.assets/image-20200701155543223.png)
+
+
+
+> 新增SpringBootServletInitializer实现类
+
+```java
+public class SpringBootStartApplication extends SpringBootServletInitializer {
+    @Override
+    protected SpringApplicationBuilder configure(SpringApplicationBuilder builder) {
+        return builder.sources( RuoYiApplication.class) ;
+
+    }
+
+}
+```
+
+> 清理缓存 + 打包
+
+```bash
+mvn clean
+mvn package
+```
+
+> 就war包放入tomcat/WEBAPPS
+
+
+
+> 开启服务器本地tomcat服务
+
+开启服务后，tomcat会自动在webapps目录下，生成对应的war包文件夹。
+
+> 问题：无法通过ip：8080 直接访问，需要 /xxx
+
+解决：加映射 <Host> 标签内
+
+```bash
+<Context path="/" docBase="/usr/local/tomcat/tomcat9/webapps/ruoyi" reloadable="false"></Context>
+```
+
+![image-20200701173618657](SpringBoot.assets/image-20200701173618657.png)
+
+
+
+把webapps/ruoyi路径  映射到 /
+
+这样再访问 ip:8080就能直接访问到ruoyi项目！
+
+
+
+> 如果配置了前端，那么前后端的交互已经完成！
+>
+> 接下来，就是考虑多配置几台后端服务器来缓解压力！
+
+
+
+## X.3 小集群
+
+环境配置：
+
+- 一台前端服务器：192.168.1.114
+- 一台后端服务器A：192.168.1.115
+- 一台后端服务器A：192.168.1.116
+
+
+
+> 前端配置
+
+![image-20200701173404233](SpringBoot.assets/image-20200701173404233.png)
+
+增加命名为ruoyi的组：
+
+- server1 ，配置流量权重为5；
+- server2，配置流量权重为3；
+
+![image-20200701173527430](SpringBoot.assets/image-20200701173527430.png)
+
+- proxy_pass由原来的 http://192.168.1.115:8080/ 到 ruoyi
+
+
+
+这样，通过访问前端 192.168.1.114:80，(前端去访问后台 192.168.1.115/116:8080) 就能实现所有功能。
