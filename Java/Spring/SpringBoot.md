@@ -1170,7 +1170,7 @@ public class LoginHandlerInterceptor implements HandlerInterceptor {
 
 
 
-## 9.1 查询 + 前端展示
+## 9.3 查询 + 前端展示
 
 > dashboard.html 主要内容
 
@@ -1263,15 +1263,151 @@ dashboard.html 和 list.html 中使用
 
 
 
+## 9.4 添加
+
+> 1. 跳转controller，到添加信息的视图
+
+
+
+- 增加 `添加员工` 按钮：
+
+![image-20200702160150887](SpringBoot.assets/image-20200702160150887.png)
+
+- 添加路由跳转
+
+![image-20200702160213395](SpringBoot.assets/image-20200702160213395.png)
+
+> > 它是一个按钮，当有跳转功能的时候，用 a 标签。
+
+- 添加Controller
+
+![image-20200702164848733](SpringBoot.assets/image-20200702164848733.png)
+
+由于部门是 <select> ， 所以需要先把部门信息提取出来。 （性别就两项，不需要提取了）
+
+add.html中，有一个添加信息的表单： action![image-20200702165023950](SpringBoot.assets/image-20200702165023950.png)
+
+其他前端内容不赘述，部门如何展示：
+
+![image-20200702165106891](SpringBoot.assets/image-20200702165106891.png)
+
+
+
+![image-20200702165121319](SpringBoot.assets/image-20200702165121319.png)
+
+通过th:each 输出从controller取到的部门信息。
+
+> 2. 提交表单内容， 写入数据库
+
+![image-20200702165337711](SpringBoot.assets/image-20200702165337711.png)
+
+表单提交的method=“post”，链接到此Controller，接受前端的employee各字段数据<font color='orange'>（保证前端每个input 的 name属性和 Employee类一致）</font>
+
+添加成功后，返回list.html
+
+
+
+## 9.5 更新
+
+与添加类似，步骤总结：
+
+1. 更新按钮，跳转路由
+
+    ```html
+    <a class="btn btn-sm btn-primary" th:href="@{/emp/} + ${emp.getId()}">
+       编辑
+    </a>
+    ```
+
+2. Controller接受前端id字段，跳转更新页面
+
+    ```java
+    @GetMapping("/emp/{id}")
+    public String toUpdatePage(Model model, @PathVariable Integer id) {
+    
+        // 查询原来的员工数据
+        Employee emp = employeeDao.getEmployeeById(id);
+    
+        model.addAttribute("emp", emp);
+    
+    
+        // 查询部门信息，需要在前端进行展示
+        Collection<Department> departments = departmentDao.getDepartments();
+    
+        model.addAttribute("depts", departments);
+    
+        return "emps/update";
+    }
+    ```
+
+3. 更新页面表单展示带有的信息， action=更新路由 method="post"
+
+    1. radio![image-20200702171556278](SpringBoot.assets/image-20200702171556278.png)
+    2. select![image-20200702171624130](SpringBoot.assets/image-20200702171624130.png)
+    3. action![image-20200702171645874](SpringBoot.assets/image-20200702171645874.png)
+
+4. 修改数据
+
+    ```java
+    @PostMapping("/updateEmp/{id}")
+    public String updateEmp(Employee employee,  @PathVariable Integer id) {
+        System.out.println("需要修改的employ 的 ID =" + id);
+        employee.setId(id);
+        employeeDao.save(employee);
+    
+        return "redirect:/emps";
+    }
+    ```
+
+5. 返回list.html
 
 
 
 
 
+## 9.6 修改
 
 
 
+- 添加路由跳转
 
+```html
+<a class="btn btn-sm btn-danger" th:href="@{/delEmp/} + ${emp.getId()}">
+   删除
+</a>
+```
+
+- Controller删除数据
+
+```java
+@GetMapping("/delEmp/{id}")
+public String deleteEmp(Model model, @PathVariable("id") Integer id) {
+
+    employeeDao.deleteEmployeeById(id);
+    return "redirect:/emps";
+}
+```
+
+
+
+## 9.7 404 error
+
+在template下创建error文件夹，放入404.html
+
+
+
+## 9.8 注销
+
+
+
+```java
+@RequestMapping("/user/logout")
+public String logout(HttpSession session) {
+	// 干掉session
+    session.invalidate();
+    return "redirect:/index.html";
+}
+```
 
 
 
