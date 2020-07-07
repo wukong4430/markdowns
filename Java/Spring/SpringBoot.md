@@ -1411,6 +1411,511 @@ public String logout(HttpSession session) {
 
 
 
+
+
+# 10 CommandLineRunner
+
+> 在我们实际工作中，总会遇到这样需求，在项目启动的时候需要做一些初始化的操作，比如初始化线程池，提前加载好加密证书等。
+
+ `CommandLineRunner`，`CommandLineRunner` 接口的 `Component` 会在所有 `Spring Beans `都初始化之后，`SpringApplication.run() `之前执行，非常适合在应用程序启动之初进行一些数据初始化的工作。
+
+
+
+只需要实现CommandLineRunner 或者ApplicationRunner 接口。重写 run方法。 两个接口的区别是：
+
+- CommandLineRunner. run(String... args)
+- ApplicationRunner.run(ApplicationArguments args)
+
+
+
+实现过程分三部分：
+
+1. 实现CommandLineRunner接口
+2. 添加Component注解
+3. 添加Order注解
+
+
+
+我们可以创建**多个**实现`CommandLineRunner`和`ApplicationRunner`接口的类。为了使他们按一定顺序执行，可以使用`@Order`注解或实现`Ordered`接口。
+
+![image-20200705201734711](SpringBoot.assets/image-20200705201734711.png)
+
+![image-20200705201748784](SpringBoot.assets/image-20200705201748784.png)
+
+
+
+
+
+
+
+# 11 WebFlux 响应式编程
+
+
+
+## 响应式编程 Reactive Programming
+
+> 面向数据流和变化传播的编程范式
+
+
+
+举例说明：
+
+例如，在命令式编程环境中，a=b+c 表示将表达式的结果赋给 a，而之后改变 b 或 c 的值不会影响 a 。但在响应式编程中，a 的值会随着 b 或 c 的更新而更新。
+
+
+
+**特点：**异步 +  事件驱动
+
+我们以前编写的大部分都是阻塞类的程序，当一个请求过来时任务会被阻塞，直到这个任务完成后再返回给前端；响应式编程接到请求后只是提交了一个请求给后端，后端会再安排另外的线程去执行任务，当任务执行完成后再异步通知到前端。
+
+
+
+
+
+# 12 ElasticSearch 整合
+
+
+
+## 是什么
+
+我们的应用经常需要添加检索功能，开源的 ElasticSearch 是目前全文搜索引擎的 首选。
+
+Elasticsearch是一个分布式搜索服务，提供Restful API，底层基于Lucene，采用 多shard(分片)的方式保证数据安全，并且提供自动resharding的功能，github 等大型的站点也是采用了ElasticSearch作为其搜索服务。
+
+
+
+## 基本概念
+
+- **文档**：一个员工数据。
+- **索引**：存储数据到ElasticSearch的过程。
+
+![img](SpringBoot.assets/16932f26bb9d022c)
+
+
+
+## 常用注解 @Document @Field
+
+```java
+public @interface Document {
+ 
+String indexName(); //索引库的名称，个人建议以项目的名称命名
+ 
+String type() default ""; //类型，个人建议以实体的名称命名
+ 
+short shards() default 5; //默认分区数
+ 
+short replicas() default 1; //每个分区默认的备份数
+ 
+String refreshInterval() default "1s"; //刷新间隔
+ 
+String indexStoreType() default "fs"; //索引文件存储类型
+}
+```
+
+
+
+```java
+public @interface Field {
+ 
+FieldType type() default FieldType.Auto; //自动检测属性的类型，可以根据实际情况自己设置
+ 
+FieldIndex index() default FieldIndex.analyzed; //默认情况下分词，一般默认分词就好，除非这个字段你确定查询时不会用到
+ 
+DateFormat format() default DateFormat.none; //时间类型的格式化
+ 
+String pattern() default ""; 
+ 
+boolean store() default false; //默认情况下不存储原文
+ 
+String searchAnalyzer() default ""; //指定字段搜索时使用的分词器
+ 
+String indexAnalyzer() default ""; //指定字段建立索引时指定的分词器
+ 
+String[] ignoreFields() default {}; //如果某个字段需要被忽略
+ 
+boolean includeInParent() default false;
+}
+```
+
+
+
+## 问题
+
+> 保证ES的版本与SpringBoot项目中的版本一致，否则无法连接。
+
+如何修改版本依赖：
+
+![image-20200707111832180](SpringBoot.assets/image-20200707111832180.png)
+
+在pom.xml中增加对应依赖的版本，就会覆盖默认的版本。
+
+
+
+根据官方文档
+
+https://www.elastic.co/guide/en/elasticsearch/client/java-rest/current/java-rest-high-getting-started-initialization.html
+
+我们首先需要创建一个对象，注入Bean。
+
+![image-20200707113357539](SpringBoot.assets/image-20200707113357539.png)
+
+
+
+目前的版本7.x.x 已经不怎么使用 Jest、原生的API，基本上都使用Rest API。源码中也为我们提供了几个对象：![image-20200707121607119](SpringBoot.assets/image-20200707121607119.png)
+
+
+
+- 查看第一个 BuilderConfiguration：
+
+![image-20200707121910747](SpringBoot.assets/image-20200707121910747.png)
+
+> 给了两个Bean，一些默认的配置都在这个类中构建。
+
+- RestHighLevelClientConfiguration
+
+![image-20200707122031901](SpringBoot.assets/image-20200707122031901.png)
+
+> 我们常用的这个类构建自己的：例如官方文档中给出的第一个例子
+
+```java
+@Configuration
+public class ElasticSearchConfig {
+
+    /**
+     * <bean id="restHighLevelClient" class="RestHighLevelClient"></>
+     * @return
+     */
+    @Bean
+    public RestHighLevelClient restHighLevelClient() {
+        RestHighLevelClient client = new RestHighLevelClient(
+                RestClient.builder(
+                        new HttpHost("192.168.1.114", 9200, "http")
+                )
+        );
+        return client;
+    }
+
+}
+```
+
+配置了RestHighLevelClient，上面的@ConditionalOnMissingBean注解就生效了。要是想用他默认的，bean的名称就是elasticsearchRestHighLevelClient， 而我们的对象叫 ：restHighLevelClient。
+
+- 第三个：普通的RestClient
+
+![image-20200707122549874](SpringBoot.assets/image-20200707122549874.png)
+
+> 平时也不用这个 Low Level的API。
+
+
+
+## ES-Java API 测试
+
+**一、创建索引测试**
+
+```java
+@SpringBootTest
+class KiccEsApiApplicationTests {
+
+   @Autowired
+   @Qualifier("restHighLevelClient")
+   private RestHighLevelClient client;
+
+   @Test
+   void testCreateIndex() throws IOException {
+      // 1、创建索引请求
+      CreateIndexRequest request = new CreateIndexRequest("kicc_index");
+      // 2、客户端执行请求IndicesClient，请求后获得响应
+      CreateIndexResponse createIndexResponse = client.indices().create(request, RequestOptions.DEFAULT);
+
+      System.out.println(createIndexResponse);
+   }
+
+}
+```
+
+打开 ES-head，连接ES，可以看到
+
+```bash
+docker run -p 9100:9100 mobz/elasticsearch-head:5
+```
+
+![image-20200707140525374](SpringBoot.assets/image-20200707140525374.png)
+
+
+
+
+
+>  常用API
+
+```java
+package com.kicc;
+
+import com.alibaba.fastjson.JSON;
+import com.kicc.pojo.User;
+import com.kicc.utils.ESCont;
+import org.apache.lucene.util.QueryBuilder;
+import org.elasticsearch.action.bulk.BulkRequest;
+import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.delete.DeleteRequest;
+import org.elasticsearch.action.delete.DeleteResponse;
+import org.elasticsearch.action.get.GetRequest;
+import org.elasticsearch.action.get.GetResponse;
+import org.elasticsearch.action.index.IndexRequest;
+import org.elasticsearch.action.index.IndexResponse;
+import org.elasticsearch.action.search.SearchRequest;
+import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.action.update.UpdateRequest;
+import org.elasticsearch.action.update.UpdateResponse;
+import org.elasticsearch.client.RequestOptions;
+import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.client.indices.CreateIndexRequest;
+import org.elasticsearch.client.indices.CreateIndexResponse;
+import org.elasticsearch.client.indices.GetIndexRequest;
+import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.common.xcontent.XContentType;
+import org.elasticsearch.index.query.MatchAllQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.query.TermQueryBuilder;
+import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.fetch.subphase.FetchSourceContext;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.concurrent.TimeUnit;
+
+@SpringBootTest
+class KiccEsApiApplicationTests {
+
+   @Autowired
+   @Qualifier("restHighLevelClient")
+   private RestHighLevelClient client;
+
+   @Test
+   void testCreateIndex() throws IOException {
+      // 1、创建索引请求
+      CreateIndexRequest request = new CreateIndexRequest("kicc_index");
+      // 2、客户端执行请求IndicesClient，请求后获得响应
+      CreateIndexResponse createIndexResponse = client.indices().create(request, RequestOptions.DEFAULT);
+
+      System.out.println(createIndexResponse);
+   }
+
+   /**
+    * 判断索引是否存在
+    * @throws IOException
+    */
+   @Test
+   void testIndexExist() throws IOException {
+      GetIndexRequest request = new GetIndexRequest("kicc_index");
+      boolean exists = client.indices().exists(request, RequestOptions.DEFAULT);
+      System.out.println(exists?"索引存在":"索引不存在");
+   }
+
+   /**
+    * 测试插入文档
+    * 1、创建Index请求
+    * 2、设置请求的Id，超时
+    * 3、.source方法放入Json
+    * 4、用client发送请求
+    */
+   @Test
+   void testAddDocument() throws IOException {
+      User user = new User("Kicc", 23);
+
+      // 创建请求，ES中都是用Request
+      IndexRequest request = new IndexRequest("kicc_index");
+
+      // 规则  put /kicc_index/_doc/1
+      request.id("1");
+      request.timeout(TimeValue.timeValueSeconds(1));
+
+      // 将我们的数据放入请求 Json; 导入 fastjson
+      IndexRequest source = request.source(JSON.toJSONString(user), XContentType.JSON);
+
+      // 客户端发送请求，获取响应结果
+      IndexResponse index = client.index(request, RequestOptions.DEFAULT);
+
+      System.out.println(index.getIndex());
+      System.out.println(index.status());
+      System.out.println(index.toString());
+      System.out.println(index.getResult());
+   }
+
+   /**
+    * 测试存在与否
+    * @throws IOException
+    */
+   @Test
+   void testIsExist() throws IOException {
+      // 返回Get的Request
+      GetRequest getRequest = new GetRequest("kicc_index", "1");
+
+      // 不获取返回的 _source 的上下文 （不设置也可以）
+      getRequest.fetchSourceContext(new FetchSourceContext(false));
+
+      boolean exists = client.exists(getRequest, RequestOptions.DEFAULT);
+      System.out.println(exists);
+   }
+
+   /**
+    * 测试文档获取：根据id
+    * 1、获取Get请求
+    * 2、client发送get请求
+    * 3、调用结果的各种返回：getSourceAsString
+    */
+   @Test
+   void testGetDocument() throws IOException {
+      GetRequest getRequest = new GetRequest("kicc_index", "2");
+      GetResponse documentFields = client.get(getRequest, RequestOptions.DEFAULT);
+      String sourceAsString = documentFields.getSourceAsString();
+      System.out.println(sourceAsString);
+      System.out.println(documentFields);
+   }
+
+   /**
+    * 测试更新文档
+    * 1、获取Update请求
+    * 2、设置超时
+    * 3、.doc方法添加Json字符串 （实际调用了.source()方法)
+    * 4、client发送更新请求
+    */
+   @Test
+   void testUpdateDocument() throws IOException {
+      UpdateRequest updateRequest = new UpdateRequest("kicc_index", "1");
+      User user = new User("凯哥", 18);
+
+      // 超过一秒就不执行
+      updateRequest.timeout("1s");
+      updateRequest.doc(JSON.toJSONString(user), XContentType.JSON);
+
+      UpdateResponse update = client.update(updateRequest, RequestOptions.DEFAULT);
+      System.out.println(update);
+
+      testGetDocument();
+
+   }
+
+   /**
+    * 测试删除文档
+    * 1、delete请求
+    * 2、client发送删除请求
+    */
+   @Test
+   void testDeleteDocument() throws IOException {
+      DeleteRequest deleteRequest = new DeleteRequest("kicc_index", "1");
+      deleteRequest.timeout("1s");
+
+      DeleteResponse deleteResponse = client.delete(deleteRequest, RequestOptions.DEFAULT);
+      System.out.println(deleteResponse);
+
+   }
+
+   /**
+    * 大批量的插入数据
+    * 1、创建bulk请求
+    * 2、设置超时（根据实际请求，可以设置大一点）
+    * 3、循环 add加入：每一个都是Index请求；请求中添加Json字符串
+    * 4、client发送批量请求
+    */
+   @Test
+   void testBulkRequest() throws IOException {
+      BulkRequest bulkRequest = new BulkRequest("kicc_index");
+      bulkRequest.timeout("10s");
+
+      ArrayList<User> users = new ArrayList<>();
+      users.add(new User("Kicc", 12));
+      users.add(new User("Kicc", 13));
+      users.add(new User("Kicc", 14));
+      users.add(new User("Jaya", 15));
+      users.add(new User("Jaya", 16));
+      users.add(new User("Jaya", 18));
+
+      for (int i = 0; i < users.size() ; i++) {
+         bulkRequest.add(
+               new IndexRequest(ESCont.ES_INDEX)
+                     .id(""+(i+1))
+                     .source(JSON.toJSONString(users.get(i)), XContentType.JSON)
+         );
+      }
+
+      // 批量删除
+//    for (int i = 0; i < 6; i++) {
+//       bulkRequest.add(new DeleteRequest(ESCont.ES_INDEX, ""+(i+1)));
+//    }
+
+      BulkResponse bulkResponse = client.bulk(bulkRequest, RequestOptions.DEFAULT);
+      System.out.println(bulkResponse.hasFailures());
+   }
+
+
+   /**
+    * 查询
+    * SearchRequest 搜索请求
+    * SearchSourceBuilder 条件构造
+    * HighlightBuilder 构建高亮
+    * TermQueryBuilder 精确查询
+    * MatchAllQueryBuilder 查询全部
+    * xxx QueryBuilder 对应各类查询
+    * @throws IOException
+    */
+   @Test
+   void testSearch() throws IOException {
+      SearchRequest searchRequest = new SearchRequest(ESCont.ES_INDEX);
+
+      // 构建搜索条件
+      SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
+      
+      // 查询条件 我们使用QueryBuilders 工具 来实现
+      // termQuery：精确查询
+      // matchAllQuery：查询全部
+//    TermQueryBuilder queryCondition = QueryBuilders.termQuery("age", "15");
+      MatchAllQueryBuilder queryCondition = QueryBuilders.matchAllQuery();
+
+      // Builder 根据查询条件  查询
+      sourceBuilder.query(queryCondition);
+
+      // 超时设置
+      sourceBuilder.timeout(new TimeValue(60, TimeUnit.SECONDS));
+
+      // 添加 查询条件 到 请求
+      searchRequest.source(sourceBuilder);
+
+      // 发送请求
+      SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
+
+      // 获得结果
+      String s = JSON.toJSONString(searchResponse.getHits());
+      System.out.println(s);
+      System.out.println("=============================");
+
+      for (SearchHit hit : searchResponse.getHits().getHits()) {
+         System.out.println(hit.getSourceAsMap());
+      }
+
+   }
+
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # X. 部署
 
 >  依赖管理：Maven
