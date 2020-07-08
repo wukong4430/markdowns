@@ -1906,6 +1906,289 @@ class KiccEsApiApplicationTests {
 
 
 
+# 13 整合Mybatis
+
+Mybatis的整合可以用原生的xml文件进行配置和CRUD操作，也可以用纯注解的方式进行开发。
+
+
+
+## 注解方式
+
+
+
+### 一、导入 依赖
+
+```xml
+<dependency>
+   <groupId>org.mybatis.spring.boot</groupId>
+   <artifactId>mybatis-spring-boot-starter</artifactId>
+   <version>2.0.0</version>
+</dependency>
+```
+
+
+
+### 二、连接数据库
+
+在application.yaml\properties中定义数据库相关信息
+
+```properties
+spring.datasource.url=jdbc:mysql://localhost:3306/mybatis?serverTimezone=UTC&useUnicode=true&characterEncoding=utf-8&useSSL=true
+spring.datasource.username=root
+spring.datasource.password=admin
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+```
+
+
+
+### 三、定义POJO
+
+```java
+public class User implements Serializable {
+
+   private static final long serialVersionUID = 1L;
+   private Long id;
+   private String userName;
+   private String passWord;
+   private UserSexEnum userSex;
+   private String nickName;
+```
+
+
+
+### 四、Mapper
+
+```java
+@Mapper
+@Repository
+public interface UserMapper {
+   
+   @Select("SELECT * FROM users")
+   @Results({
+      @Result(property = "userSex",  column = "user_sex", javaType = UserSexEnum.class),
+      @Result(property = "nickName", column = "nick_name")
+   })
+   List<User> getAll();
+   
+   @Select("SELECT * FROM users WHERE id = #{id}")
+   @Results({
+      @Result(property = "userSex",  column = "user_sex", javaType = UserSexEnum.class),
+      @Result(property = "nickName", column = "nick_name")
+   })
+   User getOne(Long id);
+
+   @Insert("INSERT INTO users(userName,passWord,user_sex) VALUES(#{userName}, #{passWord}, #{userSex})")
+   void insert(User user);
+
+   @Update("UPDATE users SET userName=#{userName},nick_name=#{nickName} WHERE id =#{id}")
+   void update(User user);
+
+   @Delete("DELETE FROM users WHERE id =#{id}")
+   void delete(Long id);
+
+}
+```
+
+- 接口上使用@Mapper 和 @Repository 注解
+- 方法上使用CRUD各自的注解
+- 查询方法有返回结果：用@Results注解 property 对应 类中的属性名，column对应数据表中的列名。
+
+
+
+### 多数据源 DataSource
+
+- 配置 application.properties
+
+```properties
+mybatis.type-aliases-package=com.kicc.model # 用户 CRUD 别名
+
+spring.datasource.test1.jdbc-url=jdbc:mysql://localhost:3306/test1?serverTimezone=UTC&useUnicode=true&characterEncoding=utf-8&useSSL=true
+spring.datasource.test1.username=root
+spring.datasource.test1.password=admin
+spring.datasource.test1.driver-class-name=com.mysql.cj.jdbc.Driver
+
+spring.datasource.test2.jdbc-url=jdbc:mysql://localhost:3306/test2?serverTimezone=UTC&useUnicode=true&characterEncoding=utf-8&useSSL=true
+spring.datasource.test2.username=root
+spring.datasource.test2.password=admin
+spring.datasource.test2.driver-class-name=com.mysql.cj.jdbc.Driver
+```
+
+
+
+- 配置数据源的Config
+
+```java
+@Configuration
+@MapperScan(basePackages = "com.neo.mapper.test1", sqlSessionTemplateRef  = "test1SqlSessionTemplate")
+public class DataSource1Config {
+
+    @Bean(name = "test1DataSource")
+    @ConfigurationProperties(prefix = "spring.datasource.test1")
+    @Primary
+    public DataSource testDataSource() {
+        return DataSourceBuilder.create().build();
+    }
+
+    @Bean(name = "test1SqlSessionFactory")
+    @Primary
+    public SqlSessionFactory testSqlSessionFactory(@Qualifier("test1DataSource") DataSource dataSource) throws Exception {
+        SqlSessionFactoryBean bean = new SqlSessionFactoryBean();
+        bean.setDataSource(dataSource);
+        return bean.getObject();
+    }
+
+    @Bean(name = "test1TransactionManager")
+    @Primary
+    public DataSourceTransactionManager testTransactionManager(@Qualifier("test1DataSource") DataSource dataSource) {
+        return new DataSourceTransactionManager(dataSource);
+    }
+
+    @Bean(name = "test1SqlSessionTemplate")
+    @Primary
+    public SqlSessionTemplate testSqlSessionTemplate(@Qualifier("test1SqlSessionFactory") SqlSessionFactory sqlSessionFactory) throws Exception {
+        return new SqlSessionTemplate(sqlSessionFactory);
+    }
+
+}
+```
+
+```java
+// 扫描对应的包
+@MapperScan(basePackages = "com.neo.mapper.test1", sqlSessionTemplateRef  = "test1SqlSessionTemplate")
+// 对应配置文件
+@ConfigurationProperties(prefix = "spring.datasource.test1") 
+```
+
+
+
+
+
+- 各自配置Mapper，与单个数据源的基本不变
+
+
+
+
+
+
+
+## xml 配置方式
+
+- 导入依赖
+
+- 配置文件
+
+    ```properties
+    # 配置文件的位置
+    mybatis.config-location=classpath:mybatis/mybatis-config.xml
+    # mapper对应的位置
+    mybatis.mapper-locations=classpath:mybatis/mapper/*.xml
+    # POJO
+    mybatis.type-aliases-package=com.kicc.model
+    
+    spring.datasource.url=jdbc:mysql://localhost:3306/test?serverTimezone=UTC&useUnicode=true&characterEncoding=utf-8&useSSL=true
+    spring.datasource.username=root
+    spring.datasource.password=root
+    spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+    ```
+
+- POJO
+
+- Mapper接口 （只写接口）
+
+    ```java
+    public interface UserMapper {
+       
+       List<User> getAll();
+       
+       User getOne(Long id);
+    
+       void insert(User user);
+    
+       void update(User user);
+    
+       void delete(Long id);
+    
+    }
+    ```
+
+- 实现类（xml）
+
+    ```xml
+    <?xml version="1.0" encoding="UTF-8" ?>
+    <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+    <mapper namespace="com.neo.mapper.UserMapper" >
+        <resultMap id="BaseResultMap" type="com.neo.model.User" >
+            <id column="id" property="id" jdbcType="BIGINT" />
+            <result column="userName" property="userName" jdbcType="VARCHAR" />
+            <result column="passWord" property="passWord" jdbcType="VARCHAR" />
+            <result column="user_sex" property="userSex" javaType="com.neo.enums.UserSexEnum"/>
+            <result column="nick_name" property="nickName" jdbcType="VARCHAR" />
+        </resultMap>
+        
+        <sql id="Base_Column_List" >
+            id, userName, passWord, user_sex, nick_name
+        </sql>
+    
+        <select id="getAll" resultMap="BaseResultMap"  >
+           SELECT 
+           <include refid="Base_Column_List" />
+          FROM users
+        </select>
+    
+        <select id="getOne" parameterType="java.lang.Long" resultMap="BaseResultMap" >
+            SELECT 
+           <include refid="Base_Column_List" />
+          FROM users
+          WHERE id = #{id}
+        </select>
+    
+        <insert id="insert" parameterType="com.neo.model.User" >
+           INSERT INTO 
+                  users
+                  (userName,passWord,user_sex) 
+               VALUES
+                  (#{userName}, #{passWord}, #{userSex})
+        </insert>
+        
+        <update id="update" parameterType="com.neo.model.User" >
+           UPDATE 
+                  users 
+           SET 
+               <if test="userName != null">userName = #{userName},</if>
+               <if test="passWord != null">passWord = #{passWord},</if>
+               nick_name = #{nickName}
+           WHERE 
+                  id = #{id}
+        </update>
+        
+        <delete id="delete" parameterType="java.lang.Long" >
+           DELETE FROM
+                   users 
+           WHERE 
+                   id =#{id}
+        </delete>
+    
+    </mapper>
+    ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
