@@ -75,6 +75,17 @@ System.out
 
 
 
+## 字符流
+
+- Reader： 用于读取字符流的抽象类。子类必须实现的方法只有 read(char[], int, int) 和 close()。
+    - BufferedReader ：从字符输入流中读取文本，缓冲各个字符，从而实现字符、数组和行的高效读取。 可以指定缓冲区的大小，或者可使用默认的大小。大多数情况下，默认值就足够大了。
+    - LineNumberReader ：跟踪行号的缓冲字符输入流。此类定义了方法 setLineNumber(int) 和getLineNumber()，它们可分别用于设置和获取当前行号。
+    - InputStreamReader ：是字节流通向字符流的桥梁：它使用指定的 charset 读取字节并将其解码为字符。它使用的字符集可以由名称指定或显式给定，或者可以接受平台默认的字符集。
+- Writer： 写入字符流的抽象类。子类必须实现的方法仅有 write(char[], int, int)、flush() 和 close()。
+    - BufferedWriter： ：将文本写入字符输出流，缓冲各个字符，从而提供单个字符、数组和字符串的高效写入。
+    - OutputStreamWriter ：是字符流通向字节流的桥梁：可使用指定的 charset 将要写入流中的字符编码成字节。它使用的字符集可以由名称指定或显式给定，否则将接受平台默认的字符集。
+    - FileWriter： ：用来写入字符文件的便捷类。此类的构造方法假定默认字符编码和默认字节缓冲区大小都是可接受的。要自己指定这些值，可以先在 FileOutputStream 上构造一个 OutputStreamWriter。
+
 
 
 ## 4、

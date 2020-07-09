@@ -974,7 +974,7 @@ public interface UserService {
 
 
 
-实现类
+实现类1
 
 ```java
 public class UserServiceImpl implements UserService {
@@ -1002,14 +1002,49 @@ public class UserServiceImpl implements UserService {
 
 
 
+实现类2
+
+```java
+public class UserServiceImpl2 implements UserService {
+    public void add() {
+        System.out.println("实现2");
+        System.out.println("增加了一个用户");
+    }
+
+    public void delelte() {
+        System.out.println("实现2");
+
+        System.out.println("删除了一个用户");
+
+    }
+
+    public void update() {
+        System.out.println("实现2");
+
+        System.out.println("修改了一个用户");
+
+    }
+
+    public void query() {
+        System.out.println("实现2");
+
+        System.out.println("查询了一个用户");
+
+    }
+}
+```
+
+
+
 现在想添加一个log，则利用代理类
 
 ```java
 public class UserServiceProxy implements UserService {
 
-    private UserServiceImpl userService;
+    private UserService userService;
 
-    public void setUserService(UserServiceImpl userService) {
+    // 两个实现类共用一个接口
+    public void setUserService(UserService userService) {
         this.userService = userService;
     }
 
@@ -1063,9 +1098,16 @@ public class Client {
 ```java
 public class Client {
     public static void main(String[] args) {
-        UserService userService = new UserServiceImpl();
+        // 实现类2进行代理
+        UserService userService = new UserServiceImpl2();
         UserServiceProxy proxy = new UserServiceProxy();
-        proxy.setUserService((UserServiceImpl) userService);
+        proxy.setUserService((UserServiceImpl2) userService);
+
+        // 实现类1进行代理
+//        UserService userService = new UserServiceImpl();
+//        UserServiceProxy proxy = new UserServiceProxy();
+//        proxy.setUserService((UserServiceImpl) userService);
+
 
         proxy.add();
     }
@@ -1078,7 +1120,9 @@ public class Client {
 
 在公司开发中，为增加新的功能而改动原来可行的代码是大忌。
 
-但是，确实增加了代码量！这也是缺点之一。我们用动态代理解决这个问题。
+但是，确实增加了代码量 （==足足增加了一倍==）！这也是缺点之一。我们用动态代理解决这个问题。
+
+> 假如现在又有一个新的接口 IProductService，那么同样的为ProductServiceImpl也得实现一个ProductServiceProxy代理。
 
 ![image-20200609161707200](What is Spring.assets/image-20200609161707200.png)
 
@@ -1141,7 +1185,9 @@ public class ProxyInvocationHandler implements InvocationHandler {
     }
 
     /**
-     * 生产动态代理类/实例
+     * 生产动态代理类/实例，
+     * 在得到代理类的时候，我们告诉了它我们要的是target这个类
+     * 第三个参数就是一个InvocationHandler
      */
     public Object getProxy() {
         return  Proxy.newProxyInstance(this.getClass().getClassLoader(),
@@ -1178,18 +1224,27 @@ public class Client {
 
         // 真实的角色 （等价于房东）
         UserServiceImpl userService = new UserServiceImpl();
+        
+        // 真实的角色2
+        ProductServiceImpl productService = new ProductServiceImpl()
 
         //代理角色，不存在
         ProxyInvocationHandler pih = new ProxyInvocationHandler();
 
         // 设置要代理的对象
         pih.setTarget(userService);
+        
+        // 设置要代理的对象为product
+        pih.setTarget(productService);
 
         // 动态生成代理对象 （强转成接口，而不是实现类）
-        UserService proxy = (UserService) pih.getProxy();
+        UserService userService = (UserService) pih.getProxy();
+        
+        // 动态生成代理对象
+        IProductService proxy = (IProductService) pih.getProxy();
 
-        // 代理对象调用方法
-        proxy.add();
+        // 代理对象调用方法, 此时会去调用invoke方法，有三个参数：proxy=userService,method=add,args=null
+        userService.add();
 
 
     }
@@ -1204,6 +1259,8 @@ public class Client {
 - 公共就交给了代理角色。实现了业务的分工。
 - 公共业务发生扩展的时候，方便集中管理
 - 一个动态代理类可以代理多个类。他代理的是一类业务。
+    - 静态代理中，我们实现了userServiceProxy，那么这个代理类只能为UserService这个接口的实现类进行代理。
+    - 动态代理则可以为许多相似功能的接口实现类进行代理。比如说这里的Product和User
 
 
 
@@ -1223,7 +1280,7 @@ public class Client {
     2. 生成代理角色（不是代理类、代理实例）
     3. 代理角色设置对象，1中的实例
     4. 动态的生成代理对象：getProxy
-    5. 代理对象调用方法。
+    5. 代理对象调用方法。==代码中调用了实现类的方法， 底层是调用了反射中的invoke方法==。
 
     
 
