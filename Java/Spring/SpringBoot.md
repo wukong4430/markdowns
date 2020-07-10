@@ -2071,6 +2071,35 @@ public class DataSource1Config {
 
 
 
+# 14 文件上传
+
+
+
+
+
+code gist
+
+```java
+private static String UPLOADED_FOLDER = "E://temp//";
+try {
+    // Get the file and save it somewhere
+    byte[] bytes = file.getBytes();
+    Path path = Paths.get(UPLOADED_FOLDER + file.getOriginalFilename());
+    // return the original path
+    Files.write(path, bytes);
+
+    redirectAttributes.addFlashAttribute("message",
+            "You successfully uploaded '" + file.getOriginalFilename() + "'");
+
+} catch (IOException e) {
+    e.printStackTrace();
+}
+```
+
+
+
+
+
 ## xml 配置方式
 
 - 导入依赖
