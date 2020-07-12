@@ -822,7 +822,7 @@ All these features can be combined and nested:
 如果想定义一个自己的视图解析器：
 
 ```java
-@Controller
+@Configuration
 public class MyMvcConfig implements WebMvcConfigurer {
 
     @Bean
@@ -856,6 +856,352 @@ public class MyMvcConfig implements WebMvcConfigurer {
 ![image-20200630125256638](SpringBoot.assets/image-20200630125256638.png)
 
 如果存在WebMvcConfigurationSupport，那么整个WebMvcAutoConfiguration就会失效。
+
+
+
+## 我的自定义配置类
+
+WebMvcConfigurer接口下的所有方法:
+
+![image-20200712191506561](SpringBoot.assets/image-20200712191506561.png)
+
+
+
+添加自定义配置的方式：
+
+1. 重写对应的函数
+2. 编写自定义的类，在自定义配置类中注入
+
+
+
+### configurePathMatch
+
+这个用到的比较少，这个是和访问路径有关的。举个例子，比如说PathMatchConfigurer 有个配置是setUseTrailingSlashMatch(),如果设置为true的话（默认为true），后面加个斜杠并不影响路径访问，例如“/user”等同于“/user/"。我们在开发中很少在访问路径上搞事情，所以这个方法如果有需要的请自行研究吧。
+
+
+
+### configureContentNegotiation
+
+这个东西直译叫做内容协商机制，主要是方便一个请求路径返回多个数据格式。ContentNegotiationConfigurer这个配置里面你会看到MediaType，里面有众多的格式。此方法不在多赘述。
+
+
+
+### configureAsyncSupport
+
+顾名思义，这是处理异步请求的。只能设置两个值，一个超时时间（毫秒，Tomcat下默认是10000毫秒，即10秒），还有一个是AsyncTaskExecutor，异步任务执行器。
+
+### configureDefaultServletHandling
+
+这个接口可以实现静态文件可以像Servlet一样被访问。
+
+### addFormatters
+
+> 增加转化器或者格式化器。这边不仅可以把时间转化成你需要时区或者样式。还可以自定义转化器和你数据库做交互，比如传进来userId，经过转化可以拿到user对象。
+
+
+
+### addInterceptors 添加拦截器
+
+> 添加一个拦截器
+
+```java
+private LoginHandlerInterceptor loginHandlerInterceptor;
+
+// 注入
+@Autowired
+public void setLoginHandlerInterceptor(LoginHandlerInterceptor loginHandlerInterceptor) {
+    this.loginHandlerInterceptor = loginHandlerInterceptor;
+}
+
+/**
+     * 添加拦截器
+     * @param registry
+     */
+@Override
+public void addInterceptors(InterceptorRegistry registry) {
+    // 添加拦截器
+    registry.addInterceptor(loginHandlerInterceptor).
+        addPathPatterns("/**"). // 添加拦截路径
+        excludePathPatterns("/index.html", "/", "/user/login", "/css/**", "/js/**", "/img/**");
+
+}
+```
+
+`addPathPatterns("/**")`对所有请求都拦截，但是排除了相关静态资源文件和首页、登录页。	
+
+自定义拦截器：
+
+```java
+@Component
+public class LoginHandlerInterceptor implements HandlerInterceptor {
+
+
+    /**
+     * 进行逻辑判断，如果ok就返回true，不行就返回false，返回false就不会处理请求
+     * @param request
+     * @param response
+     * @param handler
+     * @return
+     * @throws Exception
+     */
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+
+
+        // 在 /user/login 控制器下，如果登录成功才设置loginUser
+        Object loginUser = request.getSession().getAttribute("loginUser");
+
+        if (loginUser==null) {
+            request.setAttribute("msg", "请先登录！");
+            request.getRequestDispatcher("/index.html").forward(request, response);
+            return false;
+        } else {
+            return true;
+        }
+    }
+}
+```
+
+**逻辑分析：**我的拦截器拦截了除了静态资源和首页、登录页以外的所有视图！ 判断是否需要拦截的条件是有没有 loginUser这个session。
+
+
+
+### addResourceHandlers 自定义资源映射
+
+> 我们想自定义静态资源映射目录的话，只需重写addResourceHandlers方法即可。
+>
+> 注：如果继承WebMvcConfigurationSupport类实现配置时必须要重写该方法，一般不需要改。
+
+```java
+/**
+ * 配置静态访问资源
+ * @param registry
+ */
+@Override
+public void addResourceHandlers(ResourceHandlerRegistry registry) {
+    registry.addResourceHandler("/my/**").addResourceLocations("classpath:/my/");
+   
+}
+// 我们访问自定义my文件夹中的elephant.jpg 图片的地址为 http://localhost:8080/my/elephant.jpg
+
+```
+> 如果你想指定外部的目录也很简单，直接addResourceLocations指定即可
+
+```java
+@Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry.addResourceHandler("/my/**").addResourceLocations("file:E:/my/");
+        
+    }
+// addResourceLocations指的是文件放置的目录，addResoureHandler指的是对外暴露的访问路径
+```
+
+
+
+
+
+### addCorsMappings 跨域映射 
+
+> Cors = Cross-Origin resource sharing：跨域资源共享
+
+包含了三个重要的概念：**域、资源、同源策略**。
+
+- 域：由protocol、ip、port组成的一个站点。
+- 资源：URL对应的一个内容。图片、文字、代码、JSON
+- 同源策略：为了防止XSS，浏览器，客户端应该仅请求与当前页面来自同一个域的资源，请求其他域资源时需要验证。
+
+为了让跨域请求可以正常发送，又不破坏同源策略的安全性情况下，我们需要==CORS==机制。
+
+在客户端、浏览器发送实际请求之前，首先会发送一个预检请求：==判断能不能发送请求==。
+
+
+
+#### 1. 注解方式 单个controller配置
+
+```java
+@RestController
+@RequestMapping("/account")
+public class AccountController {
+
+    @CrossOrigin
+    @RequestMapping("/{id}")
+    public Account retrieve(@PathVariable Long id) {
+        // ...
+    }
+
+    @RequestMapping(method = RequestMethod.DELETE, value = "/{id}")
+    public void remove(@PathVariable Long id) {
+        // ...
+    }
+}
+```
+
+```java
+@CrossOrigin(origins = "http://domain2.com", maxAge = 3600)
+@RestController
+@RequestMapping("/account")
+public class AccountController {
+
+    @RequestMapping("/{id}")
+    public Account retrieve(@PathVariable Long id) {
+        // ...
+    }
+
+    @RequestMapping(method = RequestMethod.DELETE, value = "/{id}")
+    public void remove(@PathVariable Long id) {
+        // ...
+    }
+}
+```
+
+```kotlin
+@CrossOrigin(maxAge = 3600)
+@RestController
+@RequestMapping("/account")
+public class AccountController {
+
+    + @CrossOrigin(origins = "http://domain2.com")
+    @RequestMapping("/{id}")
+    public Account retrieve(@PathVariable Long id) {
+        // ...
+    }
+
+    @RequestMapping(method = RequestMethod.DELETE, value = "/{id}")
+    public void remove(@PathVariable Long id) {
+        // ...
+    }
+}
+```
+
+
+
+
+
+#### 2.全局配置
+
+```java
+@Configuration
+public class MyMvcConfig implements WebMvcConfigurer {
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/api/**")
+                .allowedOrigins("http://domain2.com")
+        .allowedMethods("GET", "POST", "DELETE")
+        .allowedHeaders("header1").allowCredentials(false).maxAge(3600);
+    }
+}
+```
+
+
+
+@Bean注入方式
+
+```java
+@Configuration
+public class MyConfiguration {
+
+    @Bean
+    public WebMvcConfigurer corsConfigurer() {
+        return new WebMvcConfigurerAdapter() {
+            @Override
+            public void addCorsMappings(CorsRegistry registry) {
+                registry.addMapping("/api/**");
+            }
+        };
+    }
+}
+```
+
+
+
+
+
+注意：在引入Spring Security之后，常规的配置会错问题。==具体的原因复习印象笔记==。
+
+> **发现ajax post跨域请求时，默认是不携带浏览器的cookie的**，也就是每次请求都会生成一个新的session，因此post请求都被登录拦截。
+
+可以在Spring Boot应用程序中声明如下所示的过滤器：
+
+```java
+@Configuration
+public class MyConfiguration {
+
+    @Bean
+    public FilterRegistrationBean corsFilter() {
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowCredentials(true);
+        config.addAllowedOrigin("http://domain1.com");
+        config.addAllowedHeader("*");
+        config.addAllowedMethod("*");
+        source.registerCorsConfiguration("/**", config);
+        FilterRegistrationBean bean = new FilterRegistrationBean(new CorsFilter(source));
+        bean.setOrder(0);
+        return bean;
+    }
+}
+```
+
+
+
+
+
+
+
+### addViewControllers 页面跳转
+
+> 以前写SpringMVC的时候，如果需要访问一个页面，必须要写Controller类，然后再写一个方法跳转到页面，感觉好麻烦，其实重写WebMvcConfigurer中的addViewControllers方法即可达到效果了
+
+```java
+/**
+     * 以前要访问一个页面需要先创建个Controller控制类，再写方法跳转到页面
+     * 在这里配置后就不需要那么麻烦了，直接访问http://localhost:8080/toLogin就跳转到login.jsp页面了
+     * @param registry
+     */
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        registry.addViewController("/toLogin").setViewName("login");
+        
+    }
+```
+
+值的指出的是，在这里重写addViewControllers方法，并不会覆盖WebMvcAutoConfiguration中的addViewControllers（在此方法中，Spring Boot将“/”映射至index.html），这也就意味着我们自己的配置和Spring Boot的自动配置同时有效，这也是我们推荐添加自己的MVC配置的方式。
+
+### configureViewResolvers 配置视图解析
+
+
+
+### addArgumentResolvers
+
+
+
+### addReturnValueHandlers
+
+
+
+### configureMessageConverters
+
+
+
+### extendMessageConverters
+
+
+
+### configureHandlerExceptionResolvers
+
+
+
+### extendHandlerExceptionResolvers
+
+
+
+### getValidator()
+
+
+
+### getMessageCodesResolvers
+
+
 
 
 
@@ -2210,7 +2556,112 @@ try {
 
 
 
+# 15. fastJson 整合
 
+
+
+**添加依赖：**
+
+```xml
+<!--移除默认jackson-->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+    <exclusions>
+        <exclusion>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-json</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
+<!--fastjson-->
+<dependency>
+    <groupId>com.alibaba</groupId>
+    <artifactId>fastjson</artifactId>
+    <version>1.2.70</version>
+</dependency>
+```
+
+
+
+**配置全局：**
+
+```java
+@Configuration
+public class MyMvcConfig implements WebMvcConfigurer {  
+	/**
+     * 全局配置fastJson
+     * @return
+     */
+    @Bean
+    public FastJsonHttpMessageConverter fastJsonHttpMessageConverter() {
+        FastJsonHttpMessageConverter converter = new FastJsonHttpMessageConverter();
+        FastJsonConfig fastJsonConfig = new FastJsonConfig();
+        // 配置日期的输出格式， 优先级不如注解
+        fastJsonConfig.setDateFormat("yyyy-MM-dd");
+        //
+        fastJsonConfig.setSerializerFeatures(SerializerFeature.PrettyFormat);
+//        fastJsonConfig.setCharset(Charset.forName("UTF-8"));
+        // 中文乱码
+        ArrayList<MediaType> mediaTypes = new ArrayList<>();
+        mediaTypes.add(MediaType.APPLICATION_JSON);
+        converter.setSupportedMediaTypes(mediaTypes);
+
+        // convert中添加配置
+        converter.setFastJsonConfig(fastJsonConfig);
+        // 返回converter，也就是bean
+        return converter;
+    }
+    
+}
+```
+
+
+
+
+
+## 中文乱码
+
+1. 添加全局配置
+
+    ```java
+    @Bean
+    public FastJsonHttpMessageConverter fastJsonHttpMessageConverter() {
+        FastJsonHttpMessageConverter converter = new FastJsonHttpMessageConverter();
+        FastJsonConfig fastJsonConfig = new FastJsonConfig();
+        // 配置日期的输出格式， 优先级不如注解
+        fastJsonConfig.setDateFormat("yyyy-MM-dd");
+        //
+        fastJsonConfig.setSerializerFeatures(SerializerFeature.PrettyFormat);
+        // 中文乱码
+        ArrayList<MediaType> mediaTypes = new ArrayList<>();
+        mediaTypes.add(MediaType.APPLICATION_JSON);
+        converter.setSupportedMediaTypes(mediaTypes);
+    
+        // convert中添加配置
+        converter.setFastJsonConfig(fastJsonConfig);
+        // 返回converter，也就是bean
+        return converter;
+    }
+    ```
+
+2. 在每个mapping上添加字符集
+
+    ```java
+    @ResponseBody
+    @RequestMapping(value = "/testUsers", method = RequestMethod.GET, produces = "application/json; charset=utf-8")
+    ```
+
+
+
+## 生日字符串转Date
+
+```java
+String time = "1996-03-09";
+SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+Date parse = sdf.parse(time);
+employee.setBirth(parse);
+```
 
 
 
