@@ -75,6 +75,12 @@
 
 
 
+> ```yaml
+> # LazyInitialization
+> spring：
+> 	lazy-initialization: true
+> ```
+
 
 
 
@@ -994,6 +1000,7 @@ public void addResourceHandlers(ResourceHandlerRegistry registry) {
         
     }
 // addResourceLocations指的是文件放置的目录，addResoureHandler指的是对外暴露的访问路径
+// windows当服务器的情况下，前面一定要加上一个file:。
 ```
 
 
