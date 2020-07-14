@@ -28,8 +28,6 @@
 git status
 ```
 
-
-
 ```bash
 # 简化状态输出信息
 # 输出格式：状态 文件名
@@ -50,8 +48,6 @@ git status -s / git status --short
 # 如果 git add . 之后 执行 git diff 将不会输出任何信息，因为都add了。
 git diff
 ```
-
-
 
 ```bash
 # 查看暂存起来的变化
@@ -79,16 +75,12 @@ git commit -a
 git rm -f file
 ```
 
-
-
 ```bash
 # 把文件从暂存区里移除，保留本地文件
 # 也就是这个文件我不跟踪了
 # 常用场景：当你忘记添加 .gitignore 文件，不小心把一个很大的日志文件或一堆 .a 这样的编译生成文件添加到暂存区时
 git rm --cached file
 ```
-
-
 
 
 
@@ -102,15 +94,23 @@ git mv file1 file2
 
 
 
-```bash
-1
-```
-
-
+- 日志输出
 
 ```bash
-1
+# 查看最近的三条log
+git log -3
 ```
+
+```bash
+# 直观的输出多个commit之间的联系
+git log --graph
+```
+
+> 当项目比较庞大，commit次数很多的时候，需要用各种筛选策略定位需要的日志
+
+
+
+
 
 
 

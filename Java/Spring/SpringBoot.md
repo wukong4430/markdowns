@@ -731,6 +731,252 @@ index.html可以放在任意静态资源目录下。但是不能放在template�
 
 
 
+
+
+## 6.3 数据库连接
+
+### 1 JDBC
+
+
+
+> Spring的数据底层都是 Spring Data. 可以连接JDBC、JDA、Redis、Hadoop
+
+创建项目时，需要勾选SQL下的工具。JDBC API + Mysql Driver
+
+
+
+配置yaml：
+
+```yaml
+spring:
+  datasource:
+    username: root
+    password: admin
+    url: jdbc:mysql://localhost:3306/mybatis?useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT
+    driver-class-name: com.mysql.jdbc.Driver
+```
+
+==导入了依赖和配置之后，SpringBoot就会自动创建一些Bean==。
+
+
+
+测试一下：
+
+```java
+@SpringBootTest
+class Springboot04DataApplicationTests {
+
+    @Autowired
+    DataSource dataSource;
+
+    @Test
+    void contextLoads() {
+        // 查看一下默认的数据源
+        System.out.println(dataSource.getClass());
+        
+        Connection connection = dataSource.getConnection();
+        System.out.println(connection);
+        connection.close();
+    }
+
+}
+
+class com.zaxxer.hikari.HikariDataSource
+// 默认用的是Hikari
+```
+
+
+
+>  在SpringBoot中有很多XXXTemplate，这些都是配置好的Bean，拿来直接用就可以。
+
+举例：
+
+```java
+@Configuration(proxyBeanMethods = false)
+@ConditionalOnMissingBean(JdbcOperations.class)
+class JdbcTemplateConfiguration {
+
+   @Bean
+   @Primary
+   JdbcTemplate jdbcTemplate(DataSource dataSource, JdbcProperties properties) {
+      JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+      JdbcProperties.Template template = properties.getTemplate();
+      jdbcTemplate.setFetchSize(template.getFetchSize());
+      jdbcTemplate.setMaxRows(template.getMaxRows());
+      if (template.getQueryTimeout() != null) {
+         jdbcTemplate.setQueryTimeout((int) template.getQueryTimeout().getSeconds());
+      }
+      return jdbcTemplate;
+   }
+
+}
+```
+
+![image-20200714130844647](SpringBoot.assets/image-20200714130844647.png)
+
+在这个包下有这个一个Template，是一个bean：JdbcTemplate，我们是可以直接用的。dataSource和properties这两个参数我们都已经有了。所以直接用就可以。
+
+**测试查询：**
+
+```java
+@RestController
+public class JdbcController {
+
+    @Autowired
+    JdbcTemplate jdbcTemplate;
+
+    /**
+     * 查询数据库的所有信息
+     * @return
+     */
+    @RequestMapping(value = "/userList", method = RequestMethod.GET)
+    public List<Map<String, Object>> userList() {
+        String sql = "select * from users";
+        List<Map<String, Object>> maps = jdbcTemplate.queryForList(sql);
+
+        return maps;
+    }
+
+}
+```
+
+
+
+### 2 Druid 最强优势: 日志的监控
+
+> 集成了日志监控，性能也不错。
+
+导入依赖
+
+```xml
+<dependency>
+    <groupId>com.alibaba</groupId>
+    <artifactId>druid</artifactId>
+    <version>1.1.14</version>
+</dependency>
+```
+
+
+
+指定数据源：
+
+只要设置type: com.alibaba.druid.pool.DruidDataSource
+
+```yaml
+spring:
+  datasource:
+    username: root
+    password: admin
+    url: jdbc:mysql://localhost:3306/mybatis?useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    type: com.alibaba.druid.pool.DruidDataSource
+    
+    #Spring Boot 默认是不注入这些属性值的，需要自己绑定
+    #druid 数据源专有配置
+    initialSize: 5
+    minIdle: 5
+    maxActive: 20
+    maxWait: 60000
+    timeBetweenEvictionRunsMillis: 60000
+    minEvictableIdleTimeMillis: 300000
+    validationQuery: SELECT 1 FROM DUAL
+    testWhileIdle: true
+    testOnBorrow: false
+    testOnReturn: false
+    poolPreparedStatements: true
+
+    #配置监控统计拦截的filters，stat:监控统计、log4j：日志记录、wall：防御sql注入
+    #如果允许时报错  java.lang.ClassNotFoundException: org.apache.log4j.Priority
+    #则导入 log4j 依赖即可，Maven 地址：https://mvnrepository.com/artifact/log4j/log4j
+    filters: stat,wall
+    maxPoolPreparedStatementPerConnectionSize: 20
+    useGlobalDataSourceStat: true
+    connectionProperties: druid.stat.mergeSql=true;druid.stat.slowSqlMillis=500
+```
+
+
+
+把配置注入Spring
+
+```java
+@Configuration
+public class DruidConfig {
+
+    /**
+     * 通过两个注解将yaml中的配置注入Spring 【关联起来了】
+     * @return
+     */
+    @ConfigurationProperties(prefix = "spring.datasource")
+    @Bean
+    public DataSource druidDataSource() {
+        return new DruidDataSource();
+    }
+}
+```
+
+
+
+开启日志监控
+
+```java
+/**
+ * 后台监控：web.xml ServletRegisterationBean
+ * 因为SpringBoot内置了serlvet容器，所以没有web。xml，替代ServletRegistrationBean
+ * @return
+ */
+@Bean
+public ServletRegistrationBean statViewServlet() {
+    ServletRegistrationBean<StatViewServlet> bean = new ServletRegistrationBean<>(new StatViewServlet(), "/druid/*");
+
+    // 后台登录需要账号密码
+    HashMap<String, String> initParameters = new HashMap<>();
+
+    // loginUsername 和 loginPassword 两个字段是固定的
+    initParameters.put("loginUsername", "admin");
+    initParameters.put("loginPassword", "123456..");
+
+    // 允许谁访问 空表示所有人都可以访问
+    initParameters.put("allow", "");
+
+    // 初始化参数
+    bean.setInitParameters(initParameters);
+    return bean;
+}
+```
+
+通过localhost:8080/druid/访问后台，==代码中必须配置这个路径。==
+
+
+
+**添加过滤器：哪些信息不需要进行统计**
+
+```java
+//配置 Druid 监控 之  web 监控的 filter
+//WebStatFilter：用于配置Web和Druid数据源之间的管理关联监控统计
+@Bean
+public FilterRegistrationBean webStatFilter() {
+    FilterRegistrationBean bean = new FilterRegistrationBean();
+    bean.setFilter(new WebStatFilter());
+
+    //exclusions：设置哪些请求进行过滤排除掉，从而不进行统计
+    Map<String, String> initParams = new HashMap<>();
+    initParams.put("exclusions", "*.js,*.css,/druid/*,/jdbc/*");
+    bean.setInitParameters(initParams);
+
+    //"/*" 表示过滤所有请求
+    bean.setUrlPatterns(Arrays.asList("/*"));
+    return bean;
+}
+```
+
+
+
+
+
+
+
+
+
 # 7 模板引擎 Thymeleaf
 
 导入Thymeleaf 3.x依赖：
@@ -2318,6 +2564,7 @@ public interface UserMapper {
    
    @Select("SELECT * FROM users")
    @Results({
+      // property 代表 pojo中的字段，column代表表中的字段，解决两者不统一的情况
       @Result(property = "userSex",  column = "user_sex", javaType = UserSexEnum.class),
       @Result(property = "nickName", column = "nick_name")
    })
@@ -2342,7 +2589,7 @@ public interface UserMapper {
 }
 ```
 
-- 接口上使用@Mapper 和 @Repository 注解
+- ==接口==上使用@Mapper 和 @Repository 注解
 - 方法上使用CRUD各自的注解
 - 查询方法有返回结果：用@Results注解 property 对应 类中的属性名，column对应数据表中的列名。
 
@@ -2412,11 +2659,22 @@ public class DataSource1Config {
 @ConfigurationProperties(prefix = "spring.datasource.test1") 
 ```
 
-
-
-
-
 - 各自配置Mapper，与单个数据源的基本不变
+
+
+
+
+
+## xml 方式
+
+1. 配置pojo别名路径；mapper和config的文件路径
+
+```yaml
+mybatis:
+  type-aliases-package: com.kicc.pojo
+  mapper-locations: classpath:mybatis/mapper/*.xml
+  config-location: classpath:mybatis/mybatis-config.xml
+```
 
 
 
@@ -2629,30 +2887,105 @@ public class MyMvcConfig implements WebMvcConfigurer {
 
 ## 中文乱码
 
-1. 添加全局配置
+1. 添加全局配置 方式一
 
     ```java
-    @Bean
-    public FastJsonHttpMessageConverter fastJsonHttpMessageConverter() {
-        FastJsonHttpMessageConverter converter = new FastJsonHttpMessageConverter();
-        FastJsonConfig fastJsonConfig = new FastJsonConfig();
-        // 配置日期的输出格式， 优先级不如注解
-        fastJsonConfig.setDateFormat("yyyy-MM-dd");
-        //
-        fastJsonConfig.setSerializerFeatures(SerializerFeature.PrettyFormat);
-        // 中文乱码
-        ArrayList<MediaType> mediaTypes = new ArrayList<>();
-        mediaTypes.add(MediaType.APPLICATION_JSON);
-        converter.setSupportedMediaTypes(mediaTypes);
+    @Configuration
+    public class MyMvcConfig implements WebMvcConfigurer {
     
-        // convert中添加配置
-        converter.setFastJsonConfig(fastJsonConfig);
-        // 返回converter，也就是bean
-        return converter;
+        @Bean
+        public FastJsonHttpMessageConverter fastJsonHttpMessageConverter() {
+            FastJsonHttpMessageConverter converter = new FastJsonHttpMessageConverter();
+            FastJsonConfig fastJsonConfig = new FastJsonConfig();
+            // 配置日期的输出格式， 优先级不如注解
+            fastJsonConfig.setDateFormat("yyyy-MM-dd");
+            //
+            fastJsonConfig.setSerializerFeatures(SerializerFeature.PrettyFormat);
+            // 中文乱码
+            ArrayList<MediaType> mediaTypes = new ArrayList<>();
+            mediaTypes.add(MediaType.APPLICATION_JSON);
+            converter.setSupportedMediaTypes(mediaTypes);
+    
+            // convert中添加配置
+            converter.setFastJsonConfig(fastJsonConfig);
+            // 返回converter，也就是bean
+            return converter;
+        }
     }
     ```
 
-2. 在每个mapping上添加字符集
+    
+
+    
+
+    **方式二：**	创建一个单独的配置文件，再AutoWired到全局的配置文件中。
+
+    MyFastJsonConfig.java
+
+    ```java
+    package com.kicc.config;
+    
+    import java.util.ArrayList;
+    
+    /**
+     * @author Kicc
+     * @date 20/7/14 下午 2:57
+     */
+    @Configuration
+    public class MyFastJsonConfig {
+    
+    
+        @Bean
+        public FastJsonHttpMessageConverter fastJsonHttpMessageConverter() {
+            FastJsonHttpMessageConverter converter = new FastJsonHttpMessageConverter();
+            FastJsonConfig fastJsonConfig = new FastJsonConfig();
+    
+            // 配置日期的输出格式， 优先级不如注解
+            fastJsonConfig.setDateFormat("yyyy-MM-dd");
+            //
+            fastJsonConfig.setSerializerFeatures(SerializerFeature.PrettyFormat);
+            // 中文乱码
+            ArrayList<MediaType> mediaTypes = new ArrayList<>();
+            mediaTypes.add(MediaType.APPLICATION_JSON);
+            converter.setSupportedMediaTypes(mediaTypes);
+    
+            // convert中添加配置
+            converter.setFastJsonConfig(fastJsonConfig);
+            // 返回converter，也就是bean
+            return converter;
+        }
+    }
+    ```
+
+    
+
+    MyMvcConfig.java
+
+    ```java
+    public class MyMvcConfig implements WebMvcConfigurer {
+    
+    
+        @Autowired
+        private FastJsonHttpMessageConverter fastJsonHttpMessageConverter;
+    
+        /**
+         * fastJson配置
+         * @param converters
+         */
+        @Override
+        public void configureMessageConverters(List<HttpMessageConverter<?>> converters) {
+            converters.add(fastJsonHttpMessageConverter);
+        }
+    }
+    ```
+
+    
+
+
+
+
+
+1. 在每个mapping上添加字符集
 
     ```java
     @ResponseBody
