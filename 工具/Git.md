@@ -112,40 +112,74 @@ git log --graph
 
 
 
-
+## 远程仓库操作
 
 ```bash
-1
+# 查看远程仓库的简写和URL
+git remote -v
+
+$ git remote -v
+origin  https://gitee.com/kicc/JavaGuide.git (fetch)
+origin  https://gitee.com/kicc/JavaGuide.git (push)
+```
+
+
+
+- **拉取到本地**
+
+```bash
+# 运行 git remote add <shortname> <url> 添加一个新的远程 Git 仓库，同时指定一个方便使用的简写
+$ git remote add pb https://github.com/paulboone/ticgit
+$ git remote -v
+origin	https://github.com/schacon/ticgit (fetch)
+origin	https://github.com/schacon/ticgit (push)
+pb	https://github.com/paulboone/ticgit (fetch)
+pb	https://github.com/paulboone/ticgit (push)
+
+# 现在你可以在命令行中使用字符串 pb 来代替整个 URL。
+# 可以执行 git fetch <remote>来拉取。 
+git fetch pb
+```
+
+> 须注意 `git fetch` 命令只会将数据下载到你的本地仓库——它并不会自动合并或修改你当前的工作。合并需要手动。
+
+```bash
+# 如果【当前】分支设置了跟踪远程分支，git pull 命令来自动抓取后合并该远程分支到当前分支。
+git pull
+```
+
+
+
+- **推送到远程**
+
+```bash
+# 这个命令很简单：git push <remote> <branch>,把本地分支推送到服务器
+git push origin master
+```
+
+> 只有当你有所克隆服务器的写入权限，并且之前没有人推送过时，这条命令才能生效。
+>
+> 如果push时，其他协作者已经push过了。则必须先fetch最新的内容进行合并后才能push。
+
+
+
+- **远程仓库的重命名与移除**
+
+```bash
+# 你可以运行 git remote rename 来修改一个远程仓库的简写名
+$ git remote rename pb paul
+$ git remote
+origin
+paul
 ```
 
 
 
 ```bash
-1
-```
-
-
-
-```bash
-1
-```
-
-
-
-```bash
-1
-```
-
-
-
-```bash
-1
-```
-
-
-
-```bash
-1
+# 移除一个远程仓库，这个远程仓库相关的远程跟踪分支以及配置信息都被删除。
+$ git remote remove paul
+$ git remote
+origin
 ```
 
 
