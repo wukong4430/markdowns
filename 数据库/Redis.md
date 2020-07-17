@@ -1375,9 +1375,336 @@ void test() {
 
 ## Redis.conf详解
 
+配置时，都靠配置文件来启动！
+
+> 内存大小设置，大小写不敏感
+
+![image-20200717162013922](Redis.assets/image-20200717162013922.png)
+
+> 包含多个配置文件
+
+![image-20200717162056703](Redis.assets/image-20200717162056703.png)
+
+
+
+> 网络
+
+一、绑定的IP
+
+![image-20200717162237852](Redis.assets/image-20200717162237852.png)
+
+
+
+二、
+
+
+
+> 通用
+
+```bash
+daemonize yes # 后台守护进程方式
+pidfile /var/run/redis_6379.pid  # 如果以后台方式运行，我们就需要指定一个pid进程文件
+
+# 日志
+# Specify the server verbosity level.
+# This can be one of:
+# debug (a lot of information, useful for development/testing)
+# verbose (many rarely useful info, but not a mess like the debug level)
+# notice (moderately verbose, what you want in production probably)  生产环境使用
+# warning (only very important / critical messages are logged)	
+loglevel notice
+
+# 文件名 ”“表示标准输出
+logfile ""
+
+
+```
+
+
+
+> 快照
+
+持久化操作。在规定的时间内，执行了多少次操作，则会持久化到文件。 .rdb 和 .aof文件。
+
+redis 是 内存数据库，如果没有持久化，数据断电即失。
+
+```bash
+
+# 
+#   In the example below the behaviour will be to save:
+#   after 900 sec (15 min) if at least 1 key changed
+#   after 300 sec (5 min) if at least 10 keys changed
+#   after 60 sec if at least 10000 keys changed
+#
+#   Note: you can disable saving completely by commenting out all "save" lines.
+#
+#   It is also possible to remove all the previously configured save
+#   points by adding a save directive with a single empty string argument
+#   like in the following example:
+#
+#   save ""
+
+save 900 1   # 900秒 超过一个key修改，进行持久化
+save 300 10  # 30秒内 超过10个key修改，进行持久化
+save 60 10000 # 高并发下的持久化策略
+
+# 
+stop-writes-on-bgsave-error yes
+
+# 是否压缩rdb文件，需要消耗cpu
+rdbcompression yes
+# 检查rdb文件的校验
+rdbchecksum yes
+
+# rdb的文件和路径
+dbfilename dump.rdb
+dir ./
+
+```
+
+
+
+> Replication 主从复制
+
+
+
+
+
+
+
+> Security 安全
+
+```bash
+# 密码的设置
+127.0.0.1:6379> ping
+PONG
+127.0.0.1:6379> config get requiredpass
+(empty list or set)
+127.0.0.1:6379> config get requirepass
+1) "requirepass"
+2) ""
+127.0.0.1:6379> config set requirepass 123456
+OK
+127.0.0.1:6379> ping
+(error) NOAUTH Authentication required.
+127.0.0.1:6379> auth 123456
+OK
+127.0.0.1:6379> ping
+PONG
+
+```
+
+
+
+> 客户端限制
+
+```bash
+
+# maxclients 10000
+
+# 如果内存满了，怎么处理
+# maxmemory-policy noeviction
+# 6个策略
+noeviction:默认策略，不淘汰，如果内存已满，添加数据是报错。
+allkeys-lru:在所有键中，选取最近最少使用的数据抛弃。
+volatile-lru:在设置了过期时间的所有键中，选取最近最少使用的数据抛弃。
+allkeys-random: 在所有键中，随机抛弃。
+volatile-random: 在设置了过期时间的所有键，随机抛弃。
+volatile-ttl:在设置了过期时间的所有键，抛弃存活时间最短的数据。
+```
+
+
+
+> APPEND ONLY MODE aof模式
+
+```bash
+# 默认使用rdb持久化，所以不开启aof。一般rdb够用了。
+appendonly no
+
+# 默认文件名
+appendfilename "appendonly.aof"
+
+# 同步策略
+# appendfsync always
+appendfsync everysec
+# appendfsync no
+
+
+```
+
+
+
+
+
+
+
 
 
 ## Redis持久化
+
+内存数据化必须要有的功能。
+
+#### RDB
+
+![img](https://user-gold-cdn.xitu.io/2019/6/26/16b914b543343855?imageslim)
+
+
+
+在指定时间间隔内将内存中的数据集快照写入磁盘，恢复时将快照文件直接读入内存。
+
+> 如何操作？
+
+Redis会单独创建（fork）一个子进程来进行持久化，会先将数据写入到一个临时文件中，待持久化过程都结束了，再用这个临时文件替换上次持久化文件。整个过程中，主进程不进行IO操作。保证的性能。如果需要进行大规模的数据恢复，且对于数据恢复的完整性==不是非常敏感==，那么RDB的方式比AOF更加高效。RDB的缺点就是最后一次持久化之后的数据可能丢失。
+
+RDB保存的文件是 dump.rdb
+
+> 触发规则
+
+1、save的规则满足的条件下，会自动触发rdb规则
+
+2、执行flushall命令时
+
+3、退出redis
+
+
+
+> 恢复rdb文件
+
+只需要将rdb文件放在我们redis启动目录下就可以，redis启动的时候会自动检查dump.rdb。不需要手动导入。
+
+```bash
+
+127.0.0.1:6379> config get dir
+1) "dir"
+2) "/usr/local/bin"
+127.0.0.1:6379>
+
+```
+
+优点：
+
+- 适合大规模的数据恢复
+- 对数据的完整性要求不高（万一最后一次还没来得及持久化）
+
+缺点：
+
+- 需要一定的时间间隔修改； 万一宕机，最后一次数据的修改就没了
+- fork时，会占用一定内存空间
+
+
+
+#### AOF （Append Only File)
+
+将我们所有的命令都记录下来，history，恢复的时候重新把命令执行一遍。
+
+> 使用 AOF 做持久化，每一个写命令都通过write函数追加到 appendonly.aof 中,
+
+![img](https://user-gold-cdn.xitu.io/2019/6/26/16b916ccf4224ec3?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+
+
+以日志的形式来记录每个写操作，将Redis执行过的所有指令记录下来**（读操作不记录）**，只许追加文件但不可以改写文件，redis驱动之初会读取该文件重新构建数据，换言之，redis重启的话就根据日志文件的内容将指令从前到后执行一次以完成数据的恢复工作
+
+==Aof保存的是 appendonly.aof文件==。大规模数据情况下，恢复起来比较慢。
+
+redis.conf默认不开启aof，需要手动开启。
+
+
+
+来看一下appendonly.aof长什么样子
+
+![image-20200717174844874](Redis.assets/image-20200717174844874.png)
+
+```bash
+# 查看appendonly.aof文件
+*2
+$6
+SELECT
+$1
+0
+*3
+$3
+set
+$2
+k1
+$2
+v1
+*3
+$3
+set
+$2
+k2
+$2
+v2
+*3
+$3
+set
+$2
+k3
+$2
+v3
+
+```
+
+我们插入了三个key-value，查看.aof文件后发现，保存的就是所有的操作记录。	
+
+假设现在我们人为修改了aof文件，文件毫无疑问地遭到了破坏！那么我们重启redis-server之后是无法直接连接上的！（因为有错误！）
+
+此时，我们需要使用 redis-check-aof 来帮助恢复。
+
+![image-20200717175101536](Redis.assets/image-20200717175101536.png)
+
+```bash
+# 修复
+redis-check-aof --fix appendonly.aof
+```
+
+
+
+
+
+> 优点和缺点
+
+优点：
+
+- 每一次修改都同步 （默认每秒修改）。文件的完整性更好
+
+缺点：
+
+- 性能不高，aof修复的速度远远不如rdb。
+- Aof的运行效率也不行。（写操作）
+
+
+
+
+
+#### 两个的直观比较
+
+![img](https://user-gold-cdn.xitu.io/2019/6/26/16b918cd860b0ffd?imageslim)
+
+
+
+**区别：**
+
+- RDB持久化是指在指定的时间间隔内将内存中的数据集快照写入磁盘，实际操作过程是fork一个子进程，先将数据集写入临时文件，写入成功后，再替换之前的文件，用二进制压缩存储。
+
+- AOF持久化以日志的形式记录服务器所处理的每一个写、删除操作，查询操作不会记录，以文本的方式记录，可以打开文件看到详细的操作记录。
+
+
+
+
+
+#### 使用建议
+
+当同时开启RDB和AOF时，redis重启后会优先载入AOF文件来恢复数据。因为通常情况下，AOF文件保存的数据要比RDB更加完整。
+
+> 性能建议
+
+- 因为RDV文件只用作后备用途，建议只在Slave上持久化RDB文件。而且15分钟一次备份就够。只保留save 900 1这条规则。
+- 如果Enable AOF，好处是最恶劣情况下也只会丢失不超过两秒的数据，启动脚本较简单只load自己的aof文件就可以。代价是带来了持续的IO，**二是AOF rewrite的最后将rewrite过程中产生的新数据写到新文件造成的阻塞几乎是不可避免的。**只要硬盘许可，应该尽量减少AOF rewrite的频率。AOF重写的基础大小默认是64M，太小了！可以设置为5G，默认超过原大小100%大小重写可以改到适当的百分数。
+- 如果不Enable AOF，仅仅靠Master-Slave Replication 实现高可用性也可以，能省掉一大笔IO，也减少了rewrite时候带来的系统波动。代价是如果Master和Slave同时倒掉，会丢失十几分钟的数据，启动脚本也要比较两个Master\Slave中的RDB文件，载入较新的哪个，微博就是这种架构。
+
+
 
 
 
