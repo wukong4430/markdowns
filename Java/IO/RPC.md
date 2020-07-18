@@ -266,7 +266,7 @@
 
 > 这里只是为了过渡到动态代理的模式，用了Proxy和InvocationHandler。
 >
-> 实际使用中跟动态代理的关系不大。因为不管调用什么方法，都执行findUserById
+> 实际使用中跟动态代理的关系不大。因为不管调用什么方法，都执行findUserById （因为invoke方法中的Method参数并没有使用）
 
 
 
@@ -438,6 +438,7 @@
     public static void process(Socket socket) throws IOException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
         InputStream inputStream = socket.getInputStream();
         OutputStream outputStream = socket.getOutputStream();
+        // 新增的内容
         ObjectInputStream ois = new ObjectInputStream(inputStream);
         ObjectOutputStream oos = new ObjectOutputStream(outputStream);
     

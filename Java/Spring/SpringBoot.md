@@ -3007,9 +3007,45 @@ employee.setBirth(parse);
 
 
 
+# 16 任务
 
 
 
+一、异步任务
+
+> 在方法上加上注解 @Async
+>
+> 开启@EnableAsync
+
+
+
+二、邮件任务
+
+导入依赖
+
+```xml
+<dependency>
+   <groupId>org.springframework.boot</groupId>
+   <artifactId>spring-boot-starter-mail</artifactId>
+</dependency>
+
+```
+
+
+
+
+
+三、定时任务
+
+> 在方法上加上注解 @Scheduled(crod = "*/6 * * * * ?") \@Scheduled(fixedRate = 6000) 等
+>
+> 开启 @EnableScheduled
+
+**cron表达式：**
+
+秒 	分	时	日	月	周几
+
+周几（0-7）
 
 
 

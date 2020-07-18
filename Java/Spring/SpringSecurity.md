@@ -591,20 +591,32 @@ public class ShiroConfig {
     // 1. ShiroFilterFactoryBean
     @Bean
     public ShiroFilterFactoryBean getShiroFilterFactoryBean(@Qualifier("securityManager") DefaultWebSecurityManager defaultWebSecurityManager) {
-        ShiroFilterFactoryBean bean = new ShiroFilterFactoryBean();
+        ShiroFilterFactoryBean shiroFilterFactoryBean = new ShiroFilterFactoryBean();
+        // 必须设置 SecurityManager
+        shiroFilterFactoryBean.setSecurityManager(securityManager);
+        // setLoginUrl 如果不设置值，默认会自动寻找Web工程根目录下的"/login.jsp"页面 或 "/login" 映射
+        shiroFilterFactoryBean.setLoginUrl("/notLogin");
+        // 设置无权限时跳转的 url;
+        shiroFilterFactoryBean.setUnauthorizedUrl("/notRole");
 
-        // 设置安全管理器
-        bean.setSecurityManager(defaultWebSecurityManager);
+        // 设置拦截器
+        Map<String, String> filterChainDefinitionMap = new LinkedHashMap<>();
+        //游客，开发权限
+        filterChainDefinitionMap.put("/guest/**", "anon");
+        //用户，需要角色权限 “user”
+        filterChainDefinitionMap.put("/user/**", "roles[user]");
+        //管理员，需要角色权限 “admin”
+        filterChainDefinitionMap.put("/admin/**", "roles[admin]");
+        //开放登陆接口
+        filterChainDefinitionMap.put("/login", "anon");
+        //其余接口一律拦截
+        //主要这行代码必须放在所有权限设置的最后，不然会导致所有 url 都被拦截
+        filterChainDefinitionMap.put("/**", "authc");
 
-        // 添加过滤器
-        LinkedHashMap<String, String> map = new LinkedHashMap<>();
-        map.put("/user/add", "authc");
-        map.put("/user/update", "authc");
+        shiroFilterFactoryBean.setFilterChainDefinitionMap(filterChainDefinitionMap);
+        System.out.println("Shiro拦截器工厂类注入成功");
+        return shiroFilterFactoryBean;
 
-        bean.setFilterChainDefinitionMap(map);
-        bean.setLoginUrl("/tologin");
-
-        return bean;
     }
 
 
@@ -631,10 +643,6 @@ public class ShiroConfig {
 
 
 
-
-
-
-
 > Shiro 的内置过滤器 集合。
 
 | Filter       | 解释                                                         |
@@ -653,6 +661,68 @@ public class ShiroConfig {
 常用的主要就是 anon，authc，user，roles，perms 等
 
 
+
+
+
+
+
+**登录Controller的编写**：
+
+需要对比token，如果成功就能登录。登录成功后就可以获得认证，就能访问filter中设置的页面。
+
+**比如登录的是一个admin，那么登录后就能访问 roles[admin]规范下的所有页面！**（直到这个admin用户注销）
+
+```java
+@RestController
+public class LoginController {
+    @Autowired    
+    private ResultMap resultMap;
+    private UserMapper userMapper;
+
+@RequestMapping(value = "/notLogin", method = RequestMethod.GET)
+public ResultMap notLogin() {
+    return resultMap.success().message("您尚未登陆！");
+}
+
+@RequestMapping(value = "/notRole", method = RequestMethod.GET)
+public ResultMap notRole() {
+    return resultMap.success().message("您没有权限！");
+}
+
+@RequestMapping(value = "/logout", method = RequestMethod.GET)
+public ResultMap logout() {
+    Subject subject = SecurityUtils.getSubject();
+    //注销
+    subject.logout();
+    return resultMap.success().message("成功注销！");
+}
+
+/**
+ * 登陆
+ *
+ * @param username 用户名
+ * @param password 密码
+ */
+@RequestMapping(value = "/login", method = RequestMethod.POST)
+public ResultMap login(String username, String password) {
+    // 从SecurityUtils里边创建一个 subject
+    Subject subject = SecurityUtils.getSubject();
+    // 在认证提交前准备 token（令牌）
+    UsernamePasswordToken token = new UsernamePasswordToken(username, password);
+    // 执行认证登陆
+    subject.login(token);
+    //根据权限，指定返回数据
+    String role = userMapper.getRole(username);
+    if ("user".equals(role)) {
+        return resultMap.success().message("欢迎登陆");
+    }
+    if ("admin".equals(role)) {
+        return resultMap.success().message("欢迎来到管理员页面");
+    } 
+    return resultMap.fail().message("权限错误！");
+}
+}
+```
 
 
 
