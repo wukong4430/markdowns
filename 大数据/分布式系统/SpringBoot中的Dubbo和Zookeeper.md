@@ -167,31 +167,366 @@ remote-consumer.xml:
 
 # zookeeper 服务开启
 
+**一、下载apache-zookeeper**
+
+注意：3.5.5以后需要下载  `apache-zookeeper-3.x.x-bin.tar.gz`. 而不是 不带bin的
+
+
+
+**二、复制conf/zoo_sample.cfg 一份 => zoo.cfg**
+
+
+
+**三、修改zoo.cfg**
+
+```bash
+# The number of milliseconds of each tick
+tickTime=2000
+# The number of ticks that the initial 
+# synchronization phase can take
+initLimit=10
+# The number of ticks that can pass between 
+# sending a request and getting an acknowledgement
+syncLimit=5
+# the directory where the snapshot is stored.
+# do not use /tmp for storage, /tmp here is just 
+# example sakes.
+# dataDir=/tmp/zookeeper
+dataDir=/home/kicc/data/zookeeper
+# the port at which the clients will connect
+clientPort=2181
+# the maximum number of client connections.
+# increase this if you need to handle more clients
+#maxClientCnxns=60
+#
+# Be sure to read the maintenance section of the 
+# administrator guide before turning on autopurge.
+#
+# http://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_maintenance
+#
+# The number of snapshots to retain in dataDir
+#autopurge.snapRetainCount=3
+# Purge task interval in hours
+# Set to "0" to disable auto purge feature
+#autopurge.purgeInterval=1
+
+```
+
+
+
+四、开启 `zkServer.sh`
+
+```bash
+bash zkServer.sh start
+
+# 关闭
+bash zkServer.sh stop
+```
 
 
 
 
 
+**问题：zookeeper启动占用8080端口。**
+
+```
+zookeeper最近的版本中有个内嵌的管理控制台是通过jetty启动，也会占用8080 端口。
+通过查看zookeeper的官方文档，发现有3种解决途径：
+
+（1）.删除jetty。
+（2）修改端口。
+修改方法的方法有两种，一种是在启动脚本中增加 -Dzookeeper.admin.serverPort=你的端口号.一种是在zoo.cfg中增加admin.serverPort=没有被占用的端口号
+（3）停用这个服务，在启动脚本中增加"-Dzookeeper.admin.enableServer=false"
+```
 
 
 
 
 
+# Dubbo-Admin 的使用
+
+> Dubbo-Admin 是一个UI，方便查看各种信息。
+>
+> 之前的 master分支已经不用了，用最新的develop分支。
+
+一、下载
+
+```bash
+git clone https://github.com/apache/dubbo-admin.git
+```
+
+
+
+二、修改子模块dubbo-admin-server的配置
+
+```bash
+admin.registry.address=zookeeper://127.0.0.1:2181 
+admin.config-center=zookeeper://127.0.0.1:2181 
+admin.metadata-report.address=zookeeper://127.0.0.1:2181 
+#group 
+admin.registry.group=dubbo 
+admin.config-center.group=dubbo 
+admin.metadata-report.group=dubbo 
+
+admin.apollo.token=e16e5cd903fd0c97a116c873b448544b9d086de9 
+admin.apollo.appId=test 
+admin.apollo.env=dev 
+admin.apollo.cluster=default 
+admin.apollo.namespace=dubbo
+
+server.port=8081 # 默认的port是8080
+
+```
+
+
+
+三、在根目录下打包
+
+```bash
+mvn clean package -Dmaven.test.skip=true
+```
+
+
+
+四、开启项目
+
+```bash
+mvn --projects dubbo-admin-server spring-boot:run 
+或
+cd dubbo-admin-distribution/target; java -jar dubbo-admin-0.1.jar
+```
+
+
+
+五、访问 ip:8080
 
 
 
 
 
+# SpringBoot 整合
+
+存在两个角色：Provider & Consumer
+
+
+
+## Provider 服务提供者
+
+> 服务的提供者
+
+一、导入依赖
+
+
+
+```xml
+<dependency>
+   <groupId>org.apache.curator</groupId>
+   <artifactId>curator-framework</artifactId>
+   <version>2.7.1</version>
+</dependency>
+
+<dependency>
+   <groupId>org.apache.curator</groupId>
+   <artifactId>curator-recipes</artifactId>
+   <version>2.7.1</version>
+</dependency>
+
+
+<!-- https://mvnrepository.com/artifact/org.apache.dubbo/dubbo-spring-boot-starter -->
+<dependency>
+   <groupId>org.apache.dubbo</groupId>
+   <artifactId>dubbo-spring-boot-starter</artifactId>
+   <version>2.7.7</version>
+</dependency>
+
+
+<!--zookeeper 排除slf4j-->
+<dependency>
+   <groupId>org.apache.zookeeper</groupId>
+   <artifactId>zookeeper</artifactId>
+   <version>3.4.10</version>
+   <exclusions>
+      <exclusion>
+         <groupId>org.slf4j</groupId>
+         <artifactId>slf4j-log4j12</artifactId>
+      </exclusion>
+   </exclusions>
+</dependency>
+```
+
+
+
+二、添加配置
+
+```properties
+server.port=8001
+
+# 服务名称
+dubbo.application.name=User-provider-server
+# 服务注册地址
+dubbo.registry.address=zookeeper://192.168.1.114:2181
+# 哪些服务被注册
+dubbo.scan.base-packages=com.kicc.service
+# 使用元数据， Dubbo-Admin推荐使用
+dubbo.metadata-report.address=zookeeper://192.168.1.114:2181
+```
+
+
+
+三、编写服务
+
+```java
+package com.kicc.service;
+;
+
+/**
+ * @author Kicc
+ * @date 20/7/19 上午 11:36
+ */
+
+public interface TicketService {
+
+    /**
+     * 获取票
+     * @return 成功获取票的信息
+     */
+    String getTicket() ;
+}
+```
+
+
+
+```java
+package com.kicc.service;
+
+import org.apache.dubbo.config.annotation.DubboService;
+import org.springframework.stereotype.Component;
+
+/**
+ * @author Kicc
+ * @date 20/7/19 下午 12:54
+ */
+
+@DubboService // Dubbo 2.7 以后的版本
+@Component
+public class TicketServiceImpl implements TicketService {
+
+    @Override
+    public String getTicket() {
+        return "成功购买了Ticket！";
+    }
+}
+```
+
+
+
+四、开启服务
 
 
 
 
 
+## Comsumer 服务消费者
+
+
+
+一、导入同样的依赖
 
 
 
 
 
+二、配置
+
+```properties
+server.port=8002
+
+# 去注册中心拿服务
+dubbo.registry.address=zookeeper://192.168.1.114:2181
+
+# 消费者拿服务的时候需要暴露自己的名字
+dubbo.application.name=consumer-client
+```
+
+
+
+三、使用服务
+
+```java
+package com.kicc.service;
+
+import org.apache.dubbo.config.annotation.DubboReference;
+import org.springframework.stereotype.Service;
+
+/**
+ * @author Kicc
+ * @date 20/7/19 下午 1:37
+ */
+@Service
+public class UserService {
+
+    @DubboReference // Dubbo 2.7 以后
+    TicketService  ticketService;
+
+    // 想拿到provider-server提供的服务，去zookeeper中用
+
+    public void useTicket() {
+        String ticket = ticketService.getTicket();
+        System.out.println(ticket);
+    }
+}
+```
+
+为了可以使用 @DubboReference，需要在消费者端创建一个与服务提供端一样的包路径的 TicketService接口。
+
+
+
+四、测试服务的获取
+
+```java
+package com.kicc;
+
+import com.kicc.service.UserService;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class ConsumerClientApplicationTests {
+
+    @Autowired
+    private UserService userService;
+
+    @Test
+    void contextLoads() {
+        userService.useTicket();
+    }
+
+}
+```
+
+
+
+## 出现的问题
+
+![image-20200719150317729](SpringBoot中的Dubbo和Zookeeper.assets/image-20200719150317729.png)
+
+
+
+log4j依赖冲突，解决办法：在classpath下添加log4j.properties
+
+```properties
+log4j.rootLogger=DEBUG, Console
+#Console
+log4j.appender.Console=org.apache.log4j.ConsoleAppender
+log4j.appender.Console.layout=org.apache.log4j.PatternLayout
+log4j.appender.Console.layout.ConversionPattern=%d [%t] %-5p [%c] - %m%n
+log4j.logger.java.sql.ResultSet=INFO
+log4j.logger.org.apache=INFO
+log4j.logger.java.sql.Connection=DEBUG
+log4j.logger.java.sql.Statement=DEBUG
+log4j.logger.java.sql.PreparedStatement=DEBUG
+```
 
 
 

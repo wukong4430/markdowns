@@ -50,3 +50,99 @@ private List<Apple> filterApples(ArrayList<Apple> apples, Predicate<Apple> predi
 }
 ```
 
+
+
+
+
+# 通过参数化传递代码
+
+给定一个Apple， 按照不同的方式输出apple。
+
+
+
+## 原始传递函数方式
+
+
+
+接口
+
+```java
+public interface AppleFormatter {
+    String accept(Apple apple) ;
+}
+```
+
+实现1
+
+```java
+public class AppleFancyFormatter implements AppleFormatter {
+    @Override
+    public String accept(Apple apple) {
+        String characteristic = apple.getWeight() > 150 ? "heavy" : "light";
+        return "A " + characteristic + " " + apple.getColor() + " apple";
+    }
+}
+```
+
+实现2
+
+```java
+public class AppleSimpleFormatter implements AppleFormatter {
+    @Override
+    public String accept(Apple apple) {
+        return "An apple of" + apple.getWeight() + "g";
+    }
+}
+```
+
+测试
+
+```java
+@Test
+public void test3() {
+
+    // 用AppleFancyFormatter方式输出
+    prettyPrintApple(apples, new AppleFancyFormatter());
+    // 用AppleSimpleFormatter方式输出
+    prettyPrintApple(apples, new AppleSimpleFormatter());
+}
+
+public void prettyPrintApple(List<Apple> inventory, AppleFormatter formatter) {
+    for (Apple apple : inventory) {
+        String accept = formatter.accept(apple);
+        System.out.println(accept);
+    }
+}
+```
+
+> 优点：可以看到，我们把行为抽象出来，让代码适应需求的变化。
+>
+> 缺点：这个过程麻烦，因为需要声明只要实例化一次的类。
+
+
+
+## 使用匿名类
+
+**同时声明和实例化类**
+
+
+
+```java
+@Test
+public void test3() {
+
+    // 用AppleFancyFormatter方式输出
+    prettyPrintApple(apples, new AppleFancyFormatter());
+    // 用AppleSimpleFormatter方式输出
+    prettyPrintApple(apples, new AppleSimpleFormatter());
+
+    prettyPrintApple(apples, (Apple apple)->apple.getWeight() > 150?
+            "A heavy " + apple.getColor() +" apple":
+            "A light " + apple.getColor() +" apple");
+}
+```
+
+
+
+
+
