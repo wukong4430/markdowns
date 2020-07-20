@@ -142,7 +142,56 @@ public void test3() {
 }
 ```
 
+现在我们只能用于Apple这一个类，来搞个泛型！
+
+
+
+<hr/>
+
+## 泛型
+
+谓词接口
+
+```java
+public interface Predicate<T> {
+    boolean test(T t) ;
+}
+```
+
+
+
+泛型方法  注意需要加 <T>
+
+```java
+public <T> List<T> filter(List<T> list, Predicate<T> p) {
+    ArrayList<T> ts = new ArrayList<>();
+    for (T t : list) {
+        if (p.test(t)) {
+            ts.add(t);
+        }
+    }
+    return ts;
+}
+```
+
+
+
+测试
+
+```java
+    @Test
+    public void test3() {
+		
+        // 我们只写了一个接口和一个test方法，具体的方法实现在调用的时候写个匿名方法传入
+        List<Apple> filter = filter(apples, (Apple apple) -> "red".equalsIgnoreCase(apple.getColor()));
+        for (Apple apple : filter) {
+            System.out.println(apple);
+        }
+    }
+```
 
 
 
 
+
+ 

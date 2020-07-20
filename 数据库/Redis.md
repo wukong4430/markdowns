@@ -1710,15 +1710,599 @@ redis-check-aof --fix appendonly.aof
 
 ## Redis发布订阅
 
+Redis 发布订阅 （pub/sub） 是一种消息通信模式：发送者(pub)发送消息，订阅者(sub)接受消息。**微信公众号、微博等关注系统**
+
+Redis客户端可以订阅任意数量的频道。
+
+订阅/发布消息图：
+
+需要三部分：1、消息发送者，2、频道，3、消息订阅者
+
+![image-20200720143310070](Redis.assets/image-20200720143310070.png)
+
+
+
+下图展示了频道 channel1 ， 以及订阅这个频道的三个客户端 —— client2 、 client5 和 client1 之间的关系：
+
+![img](https://www.runoob.com/wp-content/uploads/2014/11/pubsub1.png)
+
+当有新消息通过 PUBLISH 命令发送给频道 channel1 时， 这个消息就会被发送给订阅它的三个客户端：
+
+![img](https://www.runoob.com/wp-content/uploads/2014/11/pubsub2.png)
+
+
+
+下表列出了 redis 发布订阅常用命令：
+
+| 序号 | 命令及描述                                                   |
+| :--- | :----------------------------------------------------------- |
+| 1    | [PSUBSCRIBE pattern [pattern ...\]](https://www.runoob.com/redis/pub-sub-psubscribe.html) 订阅一个或多个符合给定模式的频道。 |
+| 2    | [PUBSUB subcommand [argument [argument ...\]]](https://www.runoob.com/redis/pub-sub-pubsub.html) 查看订阅与发布系统状态。 |
+| 3    | [PUBLISH channel message](https://www.runoob.com/redis/pub-sub-publish.html) 将信息发送到指定的频道。 |
+| 4    | [PUNSUBSCRIBE [pattern [pattern ...\]]](https://www.runoob.com/redis/pub-sub-punsubscribe.html) 退订所有给定模式的频道。 |
+| 5    | [SUBSCRIBE channel [channel ...\]](https://www.runoob.com/redis/pub-sub-subscribe.html) 订阅给定的一个或多个频道的信息。 |
+| 6    | [UNSUBSCRIBE [channel [channel ...\]]](https://www.runoob.com/redis/pub-sub-unsubscribe.html) 指退订给定的频道。 |
+
+**测试：**
+
+- 打开一个redis-cli，开启订阅
+
+    ```bash
+    127.0.0.1:6379> SUBSCRIBE kuangshenshuo
+    Reading messages... (press Ctrl-C to quit)
+    1) "subscribe"
+    2) "kuangshenshuo"
+    ```
+
+- 打开另一个redis-cli，发布消息
+
+    ```bash
+    127.0.0.1:6379> PUBLISH kuangshenshuo "hello everyone!"
+    (integer) 1
+    ```
+
+    第一个cli中可以看到发送的消息：
+
+    ```bash
+    127.0.0.1:6379> SUBSCRIBE kuangshenshuo
+    Reading messages... (press Ctrl-C to quit)
+    1) "subscribe"
+    2) "kuangshenshuo"
+    3) (integer) 1
+    1) "message"  # 消息
+    2) "kuangshenshuo"	# 频道
+    3) "hello everyone!"	# 具体内容
+    ```
+
+- 
+
+> 原理
+
+Redis是使用C实现，通过分析Redis源码里的pubsub.c文件。可以了解发布和订阅机制的底层。
+
+Redis通过PUBLISH、SUBSCRIBE和PSUBSCRIBE等命令实现发布和订阅功能。
+
+通过SUBSCRIBE命令订阅某频道之后，redis-server里维护了一个字典，字典的键就是一个个channel，而字典的值则是一个链表，链表中保存了所有订阅这个channel的客户端。SUBSCRIBE命令的关键，就是将客户端添加到给定channel的订阅链表中。
+
+通过PUBLISH命令向订阅者发送消息，redis-server会使用给定的频道作为键，在它所维护的channel字典中查找记录了订阅这个频道的所有客户端链表，遍历这个链表，将消息发布给所有订阅者。
+
+
+
+> 使用场景
+
+1、实时消息系统
+
+2、实时聊天 （频道当作聊天室，将消息回显给所有人即可）
+
+3、订阅，关注系统都是可以的。
+
+4、稍微复杂的场景就有使用MQ来完成。
+
 
 
 ## Redis主从复制
 
 高可用，哨兵模式
 
+### 概念
+
+主从复制，是指将一台Redis服务器的数据，复制到其他Redis服务器。前者称为（Master/Leader)。后者就是（Slave/follower）。
+
+==数据的传输是单向的==，只能从Master到Slave。一般我们用Master来进行写操作，Slave进行读操作。使读写分离，提高性能。
+
+
+
+**主从复制的作用**：
+
+1、数据冗余：数据热备份，持久化之外的一种数据冗余方式
+
+2、故障恢复：当一个节点出现问题的时候，可以 由其他备份机器正常工作并故障快速恢复
+
+3、负载均衡：分担一台服务器压力
+
+4、高可用（集群）基石：除了上述作用以外，主从复制还是哨兵和集群能够实施的基础，因此说主从复制是Redis高可用的基础。
+
+
+
+查看服务器信息：
+
+```bash
+127.0.0.1:6379> info replication
+# Replication
+role:master  # 角色名
+connected_slaves:0  # 从机状态
+master_replid:46ea288c6299cbc0e2c1df4f3c82785b7b332044
+master_replid2:0000000000000000000000000000000000000000
+master_repl_offset:0
+second_repl_offset:-1
+repl_backlog_active:0
+repl_backlog_size:1048576
+repl_backlog_first_byte_offset:0
+repl_backlog_histlen:0
+
+```
+
+
+
+> 使用一主二从进行测试
+
+模式1
+
+![image-20200720162004919](Redis.assets/image-20200720162004919.png)
+
+模式2
+
+![image-20200720162052338](Redis.assets/image-20200720162052338.png)
+
+模式3...
+
+> 保证有一个主机就可以，从机怎么连接无所谓的。
+
+
+
+因为我们启动Server是读取配置文件的，所以对于每一个Server，都需要单独配置一个自己的redis.conf。
+
+需要配置的项：
+
+- port
+- pid
+- dump.rdb
+- logfile
+
+在没有配置从机之前，所有的server都是主机，相互之间也没有联系。配置只需要将从机找到自己的Master就可以了。
+
+**cli中配置：**
+
+```bash
+# 这样的配置是暂时的，如果需要永久有效在redis.conf文件中replication一节中配置即可。
+SLAVEOF HOST PORT
+```
+
+
+
+在这个配置文件中配置后就是永久的主从关系了！
+
+![image-20200720152626855](Redis.assets/image-20200720152626855.png)
+
+
+
+
+
+![image-20200720155550780](Redis.assets/image-20200720155550780.png)
+
+**默认情况下，只有主机可以写，从机只能读取。**
+
+
+
+> 复制原理
+
+Slave启动成功连接到master后会发送一个sync同步命令
+
+Master接到命令，启动后台的存盘进程，同时收集所有接受到的用于修稿数据集命令，在后台进程执行完毕之后，master将传送的整个数据文件到slave，完成一次同步。
+
+- 全量复制：slave的服务在接受到数据库文件数据后，将其存盘并加载到内存中
+- 增加复制：Master继续将新的所有收集到的修改命令依次传给slave，并完成同步
+
+==但是只要是重新连接master，一次完全同步（全量复制）将被自动执行==
+
+
+
+**问题：当一个主机宕机时，从机依旧是从机。无法进行写操作。**
+
+如果master断开，使用命令 `SLAVEOF no one`，使从机成为一个主机。
+
+
+
+### 哨兵模式 （Sentinel）
+
+> 当一个主机宕机，就自动会出现一个新的主机
+
+![image-20200720162358332](Redis.assets/image-20200720162358332.png)
+
+哨兵是一个独立的进程，通过不断地与服务器交互，判断各个服务器的状态。当有一个服务器不响应的时候，就已经挂了。这个时候哨兵将做出行动解决问题。
+
+
+
+
+
+
+
+
+
+> 哨兵测试
+
+目前是一主二从状态。
+
+### Redis Sentinel规划
+
+|      IP       | 端口号 |           角色           |
+| :-----------: | :----: | :----------------------: |
+| 192.168.1.114 |  6379  |       Redis Master       |
+| 192.168.1.115 |  6379  | Redis Master/Slave（默认 |
+| 192.168.1.116 |  6379  | Redis Master/Slave（默认 |
+| 192.168.1.114 | 26379  |         Sentinel         |
+| 192.168.1.115 | 26379  |         Sentinel         |
+| 192.168.1.116 | 26379  |         Sentinel         |
+
+
+
+启动顺序：Master -> Slave -> Sentinel
+
+
+
+
+
+1、配置哨兵文件sentinel.conf
+
+```bash
+# myredis【主机】 的名字 自定义 最后的1表示需要多少个哨兵同意
+# 三个ip的sentinel.conf文件都一致
+# redis-server的配置不一样
+sentinel monitor myredis 127.0.0.1 1
+```
+
+2、启动哨兵
+
+**启动完三个server之后，启动三个哨兵。**
+
+```bash
+redis-sentinel redisconfig/sentinel.conf
+```
+
+```bash
+[root@localhost bin]# redis-sentinel redisconfig/sentinel.conf
+59458:X 20 Jul 2020 16:36:27.988 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+59458:X 20 Jul 2020 16:36:27.988 # Redis version=5.0.5, bits=64, commit=00000000, modified=0, pid=59458, just started
+59458:X 20 Jul 2020 16:36:27.988 # Configuration loaded
+59458:X 20 Jul 2020 16:36:27.989 * Increased maximum number of open files to 10032 (it was originally set to 1024).
+                _._
+           _.-``__ ''-._
+      _.-``    `.  `_.  ''-._           Redis 5.0.5 (00000000/0) 64 bit
+  .-`` .-```.  ```\/    _.,_ ''-._
+ (    '      ,       .-`  | `,    )     Running in sentinel mode
+ |`-._`-...-` __...-.``-._|'` _.-'|     Port: 26379
+ |    `-._   `._    /     _.-'    |     PID: 59458
+  `-._    `-._  `-./  _.-'    _.-'
+ |`-._`-._    `-.__.-'    _.-'_.-'|
+ |    `-._`-._        _.-'_.-'    |           http://redis.io
+  `-._    `-._`-.__.-'_.-'    _.-'
+ |`-._`-._    `-.__.-'    _.-'_.-'|
+ |    `-._`-._        _.-'_.-'    |
+  `-._    `-._`-.__.-'_.-'    _.-'
+      `-._    `-.__.-'    _.-'
+          `-._        _.-'
+              `-.__.-'
+
+59458:X 20 Jul 2020 16:36:27.990 # WARNING: The TCP backlog setting of 511 cannot be enforced because /proc/sys/net/core/somaxconn is set to the lower value of 128.
+59458:X 20 Jul 2020 16:36:27.990 # Sentinel ID is 86d767573fdce18845ed8e82d8f13774fd70a2d0
+59458:X 20 Jul 2020 16:36:27.990 # +monitor master myredis 127.0.0.1 6379 quorum 1
+59458:X 20 Jul 2020 16:36:27.991 * +slave slave 192.168.1.115:6379 192.168.1.115 6379 @ myredis 127.0.0.1 6379
+59458:X 20 Jul 2020 16:36:27.991 * +slave slave 192.168.1.116:6379 192.168.1.116 6379 @ myredis 127.0.0.1 6379
+
+```
+
+SHUTDOWN MASTER 【模拟主机宕机】
+
+```bash
+59458:X 20 Jul 2020 16:36:58.026 # +sdown slave 192.168.1.116:6379 192.168.1.116 6379 @ myredis 127.0.0.1 6379
+59458:X 20 Jul 2020 16:36:58.027 # +sdown slave 192.168.1.115:6379 192.168.1.115 6379 @ myredis 127.0.0.1 6379
+59458:X 20 Jul 2020 16:38:02.216 # +sdown master myredis 127.0.0.1 6379
+59458:X 20 Jul 2020 16:38:02.216 # +odown master myredis 127.0.0.1 6379 #quorum 1/1
+59458:X 20 Jul 2020 16:38:02.216 # +new-epoch 1
+59458:X 20 Jul 2020 16:38:02.216 # +try-failover master myredis 127.0.0.1 6379
+59458:X 20 Jul 2020 16:38:02.216 # +vote-for-leader 86d767573fdce18845ed8e82d8f13774fd70a2d0 1
+59458:X 20 Jul 2020 16:38:02.216 # +elected-leader master myredis 127.0.0.1 6379
+59458:X 20 Jul 2020 16:38:02.216 # +failover-state-select-slave master myredis 127.0.0.1 6379
+59458:X 20 Jul 2020 16:38:02.269 # -failover-abort-no-good-slave master myredis 127.0.0.1 6379
+59458:X 20 Jul 2020 16:38:02.322 # Next failover delay: I will not start a failover before Mon Jul 20 16:44:03 2020
+
+59458:X 20 Jul 2020 16:44:03.065 # +new-epoch 2
+59458:X 20 Jul 2020 16:44:03.065 # +try-failover master myredis 127.0.0.1 6379
+59458:X 20 Jul 2020 16:44:03.066 # +vote-for-leader 86d767573fdce18845ed8e82d8f13774fd70a2d0 2
+59458:X 20 Jul 2020 16:44:03.066 # +elected-leader master myredis 127.0.0.1 6379
+59458:X 20 Jul 2020 16:44:03.066 # +failover-state-select-slave master myredis 127.0.0.1 6379
+59458:X 20 Jul 2020 16:44:03.133 # -failover-abort-no-good-slave master myredis 127.0.0.1 6379
+59458:X 20 Jul 2020 16:44:03.196 # Next failover delay: I will not start a failover before Mon Jul 20 16:50:03 2020
+# 重新打开Master，自动恢复
+59458:X 20 Jul 2020 16:45:09.170 * +reboot master myredis 127.0.0.1 6379
+59458:X 20 Jul 2020 16:45:09.269 # -sdown master myredis 127.0.0.1 6379
+59458:X 20 Jul 2020 16:45:09.269 # -odown master myredis 127.0.0.1 6379
+
+57537:X 20 Jul 2020 18:45:41.866 # +failover-end-for-timeout master redis-master 192.168.1.115 6379
+57537:X 20 Jul 2020 18:45:41.866 # +failover-end master redis-master 192.168.1.115 6379
+57537:X 20 Jul 2020 18:45:41.866 * +slave-reconf-sent-be slave 192.168.1.114:6379 192.168.1.114 6379 @ redis-master 192.168.1.115 6379
+57537:X 20 Jul 2020 18:45:41.866 * +slave-reconf-sent-be slave 192.168.1.116:6379 192.168.1.116 6379 @ redis-master 192.168.1.115 6379
+# 主机switch
+57537:X 20 Jul 2020 18:45:41.866 # +switch-master redis-master 192.168.1.115 6379 192.168.1.116 6379
+57537:X 20 Jul 2020 18:45:41.866 * +slave slave 192.168.1.114:6379 192.168.1.114 6379 @ redis-master 192.168.1.116 6379
+57537:X 20 Jul 2020 18:45:41.866 * +slave slave 192.168.1.115:6379 192.168.1.115 6379 @ redis-master 192.168.1.116 6379
+57537:X 20 Jul 2020 18:46:11.867 # +sdown slave 192.168.1.115:6379 192.168.1.115 6379 @ redis-master 192.168.1.116 6379
+
+
+#  当主机挂了之后，哨兵检测到了，会在几分钟后进行处理看看 主机会不会及时修复
+# 如果没有及时修复，就开始投票
+# 如果及时修复了，就恢复原样
+
+# 选出来新的master后，之前的master重新连接后就会自动变成slave
+
++sdown 表示哨兵主观认为数据库下线
++odown 表示哨兵客观认为数据库下线
++try-failover 表示哨兵开始进行故障恢复
++failover-end 表示哨兵完成故障修复，其中包括了领头哨兵的选举、备选从数据库的选择等等较为复杂的过程
++switch-master表示主数据库从115服务器迁移到116服务器
++slave列出了新的主数据库的2个从数据库，而哨兵并没有彻底清除51服务器的实力信息，这是因为停止的实例有可能会在将来恢复，哨兵会让其重新加入进来
+
+```
+
+
+
+优点：
+
+1. 哨兵集群，基于主从复制模式，拥有所有的主从配置优点
+2. 主从可以切换，故障可以转移，系统高可用
+3. 哨兵模式的主从切换自动进行，又方便又健壮
+
+缺点：
+
+1. Redis在线扩容麻烦，集群容量一旦到达上限，在线扩容十分麻烦
+2. 实现哨兵模式的配置其实很麻烦
+
+
+
+具体的配置的redis的压缩包里有默认的 sentinel.conf
+
+```bash
+##sentinel实例之间的通讯端口
+
+# – 以后台进程模式运行
+daemonize yes
+# – 哨兵的端口号，该端口号默认为26379。
+port 27000
+
+#redis-master
+
+# – redis-master是主数据的别名，考虑到故障恢复后主数据库的地址和端口号会发生变化，哨兵提供了命令可以通过别名获取主数据库的地址和端口号。
+# – 192.168.1.51 7000为初次配置时主数据库的地址和端口号，当主数据库发生变化时，哨兵会自动更新这个配置，不需要我们去关心。
+# –2，该参数用来表示执行故障恢复操作前至少需要几个哨兵节点同意，一般设置为N/2+1(N为哨兵总数)。
+sentinel monitor redis-master 192.168.1.51 7000 2
+
+# – 如果master在多少秒内无反应哨兵会开始进行master-slave间的切换，使用“选举”机制
+sentinel down-after-milliseconds redis-master 5000
+
+# – 如果在多少秒内没有把宕掉的那台master恢复，那哨兵认为这是一次真正的宕机，而排除该宕掉的master作为节点选取时可用的node然后等待一定的设定值的毫秒数后再来探测该节点是否恢复，如果恢复就把它作为一台slave加入哨兵监测节点群并在下一次切换时为他分配一个“选取号”。
+
+sentinel failover-timeout redis-master 900000
+
+sentinel parallel-syncs redis-master 2
+
+# redis的密码
+sentinel auth-pass redis-master 123456
+
+logfile "/data/bd/redis/sentinel/sentinel.log"                       
+```
+
+
+
 ## Redis缓存穿透和雪崩
 
+（面试高频，工作常用）
+
+Redis缓存的使用中，最要害的问题是==一致性问题==。
 
 
 
 
+
+### 缓存穿透 大面积查询不到
+
+> 概念
+
+用于想要查询一个数据，发现redis缓存中没有，也就是缓存没有命中，于是向持久层数据库发起查询。**发现也没有**，于是本次查询失败。当用户很多的时候，缓存都没有命中，于是都去请求了持久层数据库。这会给持久层数据库造成很大的压力，这时候相等于出现了缓存穿透。
+
+
+
+**像这种你如果不对参数做校验，数据库id都是大于0的，我一直用小于0的参数去请求你，每次都能绕开Redis直接打到数据库，数据库也查不到，每次都这样，并发高点就容易崩掉了。**
+
+`一般业务流程`
+
+![缓存流程图](https://user-gold-cdn.xitu.io/2019/3/22/169a333b1f799ae1?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+先查询缓存，缓存不命中再查询数据库。 然后将查询结果放在缓存中即使数据不存在，**也需要创建一个缓存**，用来防止穿库。这里需要区分一下数据是否存在。 如果数据不存在，缓存时间可以设置相对较短，防止因为主从同步等问题，导致问题被放大。
+
+这个流程中存在薄弱的问题是，当用户量太大时，我们会缓存大量数据空数据，并且一旦来一波冷用户，会造成雪崩效应。
+
+
+
+> 解决方案
+
+一般来说，大公司Redis集群多，不怕攻击，几个宕机也不怕。
+
+小公司集群少，但是黑客估计也没兴趣来攻击。
+
+**一、布隆过滤器  Bloom Filter**
+
+利用高效的**数据结构和算法**快速判断出你这个Key是否在数据库中存在，不存在你return就好了，存在你就去查了DB刷新KV再return。
+
+
+
+
+
+**二、缓存空对象**
+
+- 查询数据库后也没有查询到，那就更新缓存，存一个【null】、【位置错误】、【稍后重试】这些值。
+- 这些值的expire可以设置的短一点。保证不要短时间大量访问就可以。
+- 对于明显恶意的访问请求通过服务器配置将这个IP加入黑名单。
+
+
+
+
+
+**三、在接口层增加校验**
+
+比如用户鉴权校验，参数做校验，不合法的参数直接代码Return，比如：id 做基础校验，id <=0的直接拦截等。
+
+尽可能地区想用户会传些什么奇奇怪怪的参数过来！
+
+**举个简单的例子，你这个接口是分页查询的，但是你没对分页参数的大小做限制，调用的人万一一口气查 Integer.MAX_VALUE 一次请求就要你几秒，多几个并发你不就挂了么？是公司同事调用还好大不了发现了改掉，但是如果是黑客或者竞争对手呢？在你双十一当天就调你这个接口会发生什么，就不用我说了吧。这是之前的Leader跟我说的，我觉得大家也都应该了解下。**
+
+
+
+### 缓存击穿 单点爆破
+
+>  概述
+
+如一个微博热点，大量的用户同时访问同一个热点。持续的大并发集中访问一个key，这个key在**失效的瞬间**，持续的大并发就穿破缓存，直接请求数据库。击穿！
+
+当某个key在过期的瞬间，有大量的请求并发访问，这类数据一般是热点数据，由于缓存过期，会同时访问数据库来查询最新数据，并且回写缓存，会导致数据库瞬间压力变大。
+
+
+
+> 解决方案
+
+**设置热点数据永远不过期**
+
+从缓存层面来看，没有设置过期时间，所以不会出现热点key过期后产生的问题。
+
+**加互斥锁**
+
+分布式锁：使用分布式锁，保证对于每个key同时只有一个线程去查询后端服务，其他线程没有获得分布式锁的权限，因此只需要等待即可。这种方式将高并发的压力转移到了分布式锁，因此对分布式锁的考验很大。
+
+![006y8mN6ly1g8mg8yjuyqj30ug0u0guk.jpg](https://tva1.sinaimg.cn/large/006y8mN6ly1g8mg8yjuyqj30ug0u0guk.jpg)
+
+
+
+### 缓存雪崩
+
+> 概念
+
+缓存雪崩，是指在某一个时间段，缓存**集中过期失效**。大量的请求全部落入数据库，数据库抵挡不住就挂了。
+
+比如：Redis宕机、双11过1点大量缓存失效。通常会手动停掉一下服务，保证主要的服务可用！==（不允许退款服务）==
+
+
+
+
+
+
+
+> 解决方案
+
+**一、Redis高可用**
+
+多增加点Redis服务器。（异地多活）
+
+**二、限流降级 （SpringCloud）**
+
+停止某些服务。
+
+可以设置每秒的请求，有多少能通过组件，剩余的未通过的请求，怎么办？**走降级**！可以返回一些默认的值，或者友情提示，或者空白的值。
+
+好处：只要不是数据库服务全崩，用户大不了就多刷新几次。总能刷出来。
+
+**例子：**这个在目前主流的互联网大厂里面是最常见的，你是不是好奇，某明星爆出什么事情，你发现你去微博怎么刷都空白界面，但是有的人又直接进了，你多刷几次也出来了，现在知道了吧，那是做了降级，牺牲部分用户的体验换来服务器的安全，可还行？
+
+**三、数据预热**
+
+- 在正式部署之前，我先把可能的数据先预先访问一遍，这样部分可能大量访问的数据就会加载到缓存中。在即将发生大并发访问前手动触发加载缓存不同的key，设置不同的过期时间，让缓存失效的时间尽量均匀！
+
+- 在批量往**Redis**存数据的时候，把每个Key的失效时间（Expire）都加个**随机值**就好了，这样可以保证数据不会在同一时间大面积失效，我相信，Redis这点流量还是顶得住的。
+
+    ```bash
+    setRedis（Key，value，time + Math.random() * 10000）；
+    ```
+
+- 或者设置热点数据**永远不过期**，有更新操作就更新缓存就好了（比如运维更新了首页商品，那你刷下缓存就完事了，不要设置过期时间），电商首页的数据也可以用这个操作，保险。
+
+
+
+
+
+
+
+
+
+# 面试常见
+
+
+
+
+
+### 过期键的删除测率
+
+（1）：立即删除。在设置键的过期时间时，创建一个回调事件，当过期时间达到时，由时间处理器自动执行键的删除操作。
+ （2）：惰性删除。键过期了就过期了，不管。每次从dict字典中按key取值时，先检查此key是否已经过期，如果过期了就删除它，并返回nil，如果没过期，就返回键值。
+ （3）：定时删除。每隔一段时间，对expires字典进行检查，删除里面的过期键。
+
+> redis使用的过期键值删除策略
+
+惰性删除加上定期删除，两者配合使用。
+
+
+
+
+
+### 缓存有哪些类型
+
+缓存的类型分为：**本地缓存**、**分布式缓存**和**多级缓存**。
+
+#### 本地缓存：
+
+**本地缓存**就是在进程的内存中进行缓存，比如我们的 **JVM** 堆中，可以用 **LRUMap** 来实现，也可以使用 **Ehcache** 这样的工具来实现。
+
+本地缓存是内存访问，没有远程交互开销，性能最好，但是受限于单机容量，一般缓存较小且无法扩展。
+
+
+
+#### 分布式缓存：
+
+**分布式缓存**可以很好得解决这个问题。
+
+分布式缓存一般都具有良好的水平扩展能力，对较大数据量的场景也能应付自如。缺点就是需要进行远程请求，性能不如本地缓存。
+
+
+
+#### 多级缓存：
+
+为了平衡这种情况，实际业务中一般采用**多级缓存**，本地缓存只保存访问频率最高的部分热点数据，其他的热点数据放在分布式缓存中。
+
+在目前的一线大厂中，这也是最常用的缓存方案，单考单一的缓存方案往往难以撑住很多高并发的场景。
+
+
+
+#### 淘汰策略
+
+一般的剔除策略有 **FIFO** 淘汰最早数据、**LRU** 剔除最近最少使用、和 **LFU** 剔除最近使用频率最低的数据几种策略
+
+整一个最常用的LRU算法
+
+![img](https://tva1.sinaimg.cn/large/006y8mN6ly1g8orgm8oj0j30p10f7wfq.jpg)
+
+
+
+
+
+#### 数据不一致
+
+缓存不一致产生的原因一般是主动更新失败，例如更新 DB 后，更新 **Redis** 因为网络原因请求超时；或者是异步更新失败导致。
+
+解决的办法是，如果服务对耗时不是特别敏感可以增加重试；如果服务对耗时敏感可以通过异步补偿任务来处理失败的更新，或者短期的数据不一致不会影响业务，那么只要下次更新时可以成功，能保证最终一致性就可以。
