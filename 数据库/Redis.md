@@ -472,7 +472,7 @@ decr uid:xxxxxxx:follow  # 有人取消关注
 | :----- | :----------------------------------------------------------- |
 | 1      | [SET key value](https://www.runoob.com/redis/strings-set.html) 设置指定 key 的值 |
 | 2      | [GET key](https://www.runoob.com/redis/strings-get.html) 获取指定 key 的值。 |
-| ==3==  | [GETRANGE key start end](https://www.runoob.com/redis/strings-getrange.html) 返回 key 中字符串值的子字符 |
+| ==3==  | [GETRANGE key start end](https://www.runoob.com/redis/strings-getrange.html) 返回 key 中字符串值的子字符 闭区间 |
 | ==4==  | [GETSET key value](https://www.runoob.com/redis/strings-getset.html) 将给定 key 的值设为 value ，并返回 key 的旧值(old value)。 |
 | 5      | [GETBIT key offset](https://www.runoob.com/redis/strings-getbit.html) 对 key 所储存的字符串值，获取指定偏移量上的位(bit)。 |
 | 6      | [MGET key1 [key2..\]](https://www.runoob.com/redis/strings-mget.html) 获取所有(一个或多个)给定 key 的值。 **原子性操作** 所有获取都要成功或者都失败 |
@@ -1198,7 +1198,7 @@ spring-security、spring-data和springboot是同一层级的框架。
 
 jedis：采用的直连，多个线程操作的话，是不安全的。如果想要避免不安全的，使用jedis pool连接池！ 更像BIO
 
-lettuce：采用netty，实例可以再多个线程中进行共享，不存在线程不安全的情况！可以减少线程数量。更新NIo
+lettuce：采用netty，实例可以再多个线程中进行共享，不存在线程不安全的情况！可以减少线程数量。更像NIo
 
 
 
@@ -1224,8 +1224,10 @@ public class RedisAutoConfiguration {
       return template;
    }
 
+    // 因为最常用的是String类型的redis，因此额外多一个StringRedisTemplate
+    // StringRedisTemplate就是把 key\value\hashKey\hashValue都设置成了String类型
    @Bean
-   @ConditionalOnMissingBean  // 因为最常用的是String类型的redis，因此额外多一个StringRedisTemplate
+   @ConditionalOnMissingBean  
    public StringRedisTemplate stringRedisTemplate(RedisConnectionFactory redisConnectionFactory)
          throws UnknownHostException {
       StringRedisTemplate template = new StringRedisTemplate();
@@ -1243,6 +1245,17 @@ public class RedisAutoConfiguration {
 ![image-20200716204502794](Redis.assets/image-20200716204502794.png)
 
 .opsForXxxx用于操作不同的数据类型。ForValue是操作String类型。
+
+
+
+**无法连接Redis：**
+
+```bash
+# 开放防火墙端口
+firewall-cmd --zone=public --add-port=6379/tcp --permanent
+```
+
+
 
 
 
@@ -1366,6 +1379,49 @@ void test() {
 ![image-20200716221711833](Redis.assets/image-20200716221711833.png)
 
 
+
+
+
+
+
+## Redis 过期策略
+
+主要有两种思路，一种是定期删除，另一种是惰性删除。
+
+
+
+### 定期删除
+
+> 设定一个时间，在 Redis 中默认是每隔 100ms 就随机抽取一些设置了过期时间的 key，检查其是否过期，如果过期就删除。
+
+注意这里是随机抽取一些设置了过期时间的 key ，而是扫描所有，试想这样一个场景，如果我有 100w 个设置了过期时间的 key ，如果每次都全部扫描一遍，基本上 Redis 就死了， CPU 的负载会非常的高，全部都消耗在了检查过期 key 上面。
+
+
+
+### 惰性删除
+
+> 惰性删除的意思就是当 key 过期后，不做删除动作，等到下次使用的时候，发现 key 已经过期，这时不在返回这个 key 对应的 value ，直接将这个 key 删除掉。
+
+这种方式有一个致命的弱点，就是会有很多过期的 key-value 明明已经到了过期时间，缺还在内存中占着使用空间，大大降低了内存使用效率。
+
+**所以 Redis 的过期策略是：定期删除 + 惰性删除。** 但是，还是不保险，定期+惰性也没能在一定时间内删除过多的 key的话，那咋办？
+
+
+
+### 内存淘汰制度
+
+> 用来解决过期策略不足
+
+- noeviction: 当内存不足以容纳新写入数据时，新写入操作会报错。这个一般没啥人用吧，太傻了。
+- allkeys-lru：当内存不足以容纳新写入数据时，在键空间中，移除最近最少使用的 key（这个是最常用的）。
+- allkeys-random：当内存不足以容纳新写入数据时，在键空间中，随机移除某个 key。这个一般没人用吧，为啥要随机，肯定是把最近最少使用的 key 给干掉啊。
+- volatile-lru：当内存不足以容纳新写入数据时，在设置了过期时间的键空间中，移除最近最少使用的 key（这个一般不太合适）。
+- volatile-random：当内存不足以容纳新写入数据时，在设置了过期时间的键空间中，随机移除某个 key。这个一般也没人用吧。
+- volatile-ttl：当内存不足以容纳新写入数据时，在设置了过期时间的键空间中，有更早过期时间的 key 优先移除。
+
+面试官：来给爷写一个LRU 
+
+[LRU的实现]: ../刷题/数据结构与算法.md#链表
 
 
 
@@ -1810,6 +1866,13 @@ Redis通过PUBLISH、SUBSCRIBE和PSUBSCRIBE等命令实现发布和订阅功能�
 
 高可用，哨兵模式
 
+高可用是分为两步走的：
+
+1. 主从复制保证了读的高可用，但是当Master宕机的时候，写操作就不行了
+2. 哨兵模式使Master宕机的时候，slave可以接替Master的任务。从而实现写的高可用
+
+
+
 ### 概念
 
 主从复制，是指将一台Redis服务器的数据，复制到其他Redis服务器。前者称为（Master/Leader)。后者就是（Slave/follower）。
@@ -1920,6 +1983,10 @@ Master接到命令，启动后台的存盘进程，同时收集所有接受到�
 
 
 ### 哨兵模式 （Sentinel）
+
+[哨兵模式详解]: https://www.geekdigging.com/2020/07/16/8662209381/
+
+
 
 > 当一个主机宕机，就自动会出现一个新的主机
 
@@ -2109,6 +2176,34 @@ logfile "/data/bd/redis/sentinel/sentinel.log"
 
 
 
+
+
+
+
+## Redis Cluster
+
+前面提到，主从复制+哨兵模式都是在解决高可用的问题。
+
+但是有一个大问题，如果需要将大量的数据写入缓存，单机Master的写操作无法满足，该怎么办？
+
+
+
+> 集群
+
+可以做到在多台机器上，部署多个 Redis 实例 （一机多Redis），每个实例存储一部分的数据，同时每个 Redis 主实例可以挂载 Redis 从实例，实现了 Redis 主实例挂了，会自动切换到 Redis 从实例上来。
+
+![image-20200801004801807](Redis.assets/image-20200801004801807.png)
+
+
+
+
+
+
+
+
+
+
+
 ## Redis缓存穿透和雪崩
 
 （面试高频，工作常用）
@@ -2124,6 +2219,8 @@ Redis缓存的使用中，最要害的问题是==一致性问题==。
 > 概念
 
 用于想要查询一个数据，发现redis缓存中没有，也就是缓存没有命中，于是向持久层数据库发起查询。**发现也没有**，于是本次查询失败。当用户很多的时候，缓存都没有命中，于是都去请求了持久层数据库。这会给持久层数据库造成很大的压力，这时候相等于出现了缓存穿透。
+
+**总有傻逼要特特意搞事情**， 不按照常理发起请求
 
 
 
@@ -2185,15 +2282,21 @@ Redis缓存的使用中，最要害的问题是==一致性问题==。
 
 > 解决方案
 
-**设置热点数据永远不过期**
+**1 设置热点数据永远不过期, 针对于热点数据的不怎么更新的情况**
 
 从缓存层面来看，没有设置过期时间，所以不会出现热点key过期后产生的问题。
 
-**加互斥锁**
+**2 加互斥锁**
 
 分布式锁：使用分布式锁，保证对于每个key同时只有一个线程去查询后端服务，其他线程没有获得分布式锁的权限，因此只需要等待即可。这种方式将高并发的压力转移到了分布式锁，因此对分布式锁的考验很大。
 
 ![006y8mN6ly1g8mg8yjuyqj30ug0u0guk.jpg](https://tva1.sinaimg.cn/large/006y8mN6ly1g8mg8yjuyqj30ug0u0guk.jpg)
+
+
+
+**3 如果热点数据更新的很频繁**
+
+利用一个定时的线程在缓存过期之前 主动地重新构建缓存或者延迟过期时间。保证在一定的时间段内可以一直访问。
 
 
 
@@ -2203,7 +2306,10 @@ Redis缓存的使用中，最要害的问题是==一致性问题==。
 
 缓存雪崩，是指在某一个时间段，缓存**集中过期失效**。大量的请求全部落入数据库，数据库抵挡不住就挂了。
 
-比如：Redis宕机、双11过1点大量缓存失效。通常会手动停掉一下服务，保证主要的服务可用！==（不允许退款服务）==
+比如：
+
+- Redis宕机，大量的请求直接落到数据库
+- 双11过1点大量缓存失效。通常会手动停掉一下服务，保证主要的服务可用！==（不允许退款服务）==
 
 
 
@@ -2427,7 +2533,12 @@ Sharding。
 
 
 
+### 主从的同步策略有哪两种？
 
+- 全量同步
+- 增量同步
+
+![image-20200801003105643](Redis.assets/image-20200801003105643.png)
 
 
 
