@@ -215,6 +215,8 @@ Tomcat运行在JVM之上，它和HTTP服务器一样，绑定IP地址并监听TC
 
 # 4 框架概述
 
+
+
 ## 4.1 中心控制器 DispatcherServlet
 
 ![img](SpringMVC.assets/aHR0cHM6Ly9tbWJpei5xcGljLmNuL21tYml6X3BuZy91SkRBVUtyR0M3S3dQT1BXcTAwcE1KaWFLODZsRjZCaklhb3NWemljbFdMRUpRa3pvYnhIcnBIY210dTJ5VGVWV1BtRUk0WXE1UGFpY1M1MlZhSnQ4ZFlmUS82NDA.jpg)
@@ -1523,6 +1525,45 @@ JQuery是Js的是个库，集成了大量Javascript的方法。
 下载jquery.js 保存到 WEB-INF/static/js。
 
 目标：实现类似 Baidu 首页的焦点请求。
+
+
+
+
+
+
+
+
+
+
+
+
+
+# X 面试合集
+
+
+
+## 1、SpringMVC的八大步骤
+
+先记住几个概念：
+
+- DispatcherServlet：前端控制器
+- HandlerMapping：处理器映射器
+- HandlerExecutionChain：处理器执行链
+- HandlerAdapter：处理器适配器
+- ViewResolver：视图解析器
+
+
+
+**过程：**
+
+1. 客户端发送请求到前端控制器
+2. 前端控制器调用处理映射器
+3. 处理器映射器根据`url`查找相应的处理器（Handler），返回处理器执行链给前端控制器
+4. 前端控制器请求处理器适配器
+5. 处理器适配器执行处理器，生成ModelAndView，返回ModelAndView给前端控制器
+6. 前端控制器请求视图解析器
+7. 视图解析器返回视图对象给前端控制器
+8. 最后完成视图的渲染
 
 
 

@@ -654,3 +654,63 @@ xml
 
 # 5、生命周期和作用域
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# X、面试问题
+
+
+
+## Mybatis的原理
+
+- 通过Resource加载mappler.xml
+- 生成一个inputStream输入流，创建 `sqlSessionFactoryBuilder` 对象
+- 通过 `sqlSessionFactory` 对象的 `builder(inputStream)` 方法，返回一个 `sqlSeesionfactory `对象
+- 由 `sqlSessionFactory` 对象生成 `sqlSession` 
+- 通过 `statement id` 找到对应的 `statement`，通过传入的参数进行一系列的复杂判断生成要执行的 `sql`
+- 通过 `jdbc` 执行 `sql` 
+- 把结果封装成 `map` \  `list` 返回
+
+
+
+
+
+
+
