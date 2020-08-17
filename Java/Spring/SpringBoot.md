@@ -2990,6 +2990,26 @@ public class MyMvcConfig implements WebMvcConfigurer {
     ```java
     @ResponseBody
     @RequestMapping(value = "/testUsers", method = RequestMethod.GET, produces = "application/json; charset=utf-8")
+    
+    @ResponseBody
+    @RequestMapping(value = "/search/{keyword}/{pageNo}/{pageSize}", method = RequestMethod.GET, produces = "application/json; charset=utf-8")
+    // 返回值需要是Object，对应代码中toJSON
+    public Object search(@PathVariable("keyword") String keyword,
+                         @PathVariable("pageNo") int pageNo,
+                         @PathVariable("pageSize") int pageSize) throws Exception {
+        if (pageNo<0) {
+            throw new Exception("分页起始位置需要大于0");
+        }
+    
+        if (pageSize<=0) {
+            throw new Exception("分页大小建议大于等于1");
+        }
+    
+        List<Map<String, Object>> search = contentService.search(keyword, pageNo, pageSize);
+        Object s = JSON.toJSON(search);
+    
+        return s;
+    }
     ```
 
 

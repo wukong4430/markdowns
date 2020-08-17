@@ -677,7 +677,7 @@ void testDeleteDocument() throws IOException {
 
 # 京东实战
 
-1、创建SpringBoot项目。进行必要配置。添加前端模板
+## 1、创建SpringBoot项目。进行必要配置。添加前端模板
 
 ![image-20200816220140323](ElasticSearch.assets/image-20200816220140323.png)
 
@@ -685,7 +685,7 @@ void testDeleteDocument() throws IOException {
 
 
 
-2、完成数据采集：爬取京东数据
+## 2、完成数据采集：爬取京东数据
 
 ==将工具类注册到Spring中==
 
@@ -743,6 +743,268 @@ public class HtmlParseUtils {
 
 }
 ```
+
+
+
+
+
+## 3、添加Controller，测试把京东数据 ==> 爬取 ==> 转存到ES
+
+
+
+### 3.1 添加Service
+
+利用封装好的爬取Utils，将爬取得到的数据转存到ES中。
+
+```java
+package com.kicc.service;
+
+import com.alibaba.fastjson.JSON;
+import com.kicc.utils.HtmlParseUtils;
+import com.kicc.vo.Content;
+import org.elasticsearch.action.bulk.BulkRequest;
+import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.index.IndexRequest;
+import org.elasticsearch.client.RequestOptions;
+import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.common.xcontent.XContentType;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.util.List;
+
+/**
+ * @author Kicc
+ * @date 20/8/16 下午 10:04
+ * 业务编写
+ */
+@Service
+public class ContentService {
+
+    @Autowired
+    private RestHighLevelClient restHighLevelClient;
+
+    @Autowired
+    private HtmlParseUtils htmlParseUtils;
+
+    public Boolean saveJD(String keyword) throws IOException {
+        // 批量请求
+        BulkRequest bulkRequest = new BulkRequest("jd_goods");
+        bulkRequest.timeout("2m");
+
+        // 爬取得到的数据
+        List<Content> contents = htmlParseUtils.parseJD(keyword);
+		
+        // 装入数据
+        for (int i = 0; i < contents.size(); i++) {
+            System.out.println(contents.get(i));
+            bulkRequest.add(
+                    new IndexRequest("jd_goods")
+                            .id(""+(i+1))
+                            .source(JSON.toJSONString(contents.get(i)), XContentType.JSON)
+            );
+        }
+	
+        // 发送请求给ES
+        BulkResponse bulk = restHighLevelClient.bulk(bulkRequest, RequestOptions.DEFAULT);
+        System.out.println(bulk.hasFailures());
+		
+        // 返回Success/Failure
+        return !bulk.hasFailures();
+
+    }
+
+}
+```
+
+
+
+
+
+### 3.2 添加Controller
+
+```java
+@Controller
+public class ContentController {
+
+    @Autowired
+    private ContentService contentService;
+
+    // 根据关键字转存数据
+    @ResponseBody
+    @RequestMapping(value = "/parse/{keyword}", method = RequestMethod.GET)
+    public Boolean parse(@PathVariable("keyword") String keyword) throws IOException {
+
+        return contentService.saveJD(keyword);
+    }
+}
+```
+
+
+
+
+
+## 4、测试查询
+
+从ES中查询
+
+```java
+public List<Map<String, Object>> search(String keyword, int pageNo, int pageSize) throws IOException {
+
+    if (pageNo<0) {
+        pageNo = 0;
+    }
+
+    if (pageSize<1) {
+        pageSize = 1;
+    }
+
+    SearchRequest searchRequest = new SearchRequest("jd_goods");
+
+    // 构建搜索条件
+    SearchSourceBuilder builder = new SearchSourceBuilder();
+
+    // 分页
+    builder.from(pageNo);
+    builder.size(pageSize);
+
+    // 查询条件 我们使用 QueryBuilders 工具来实现
+    // termQuery：精确查询
+    // matchAllQuery：查询全部
+    TermQueryBuilder termQueryBuilder = QueryBuilders.termQuery("title", keyword);
+    builder.query(termQueryBuilder);
+    builder.timeout(new TimeValue(60, TimeUnit.SECONDS));
+
+    // 执行搜索
+    searchRequest.source(builder);
+    SearchResponse response = restHighLevelClient.search(searchRequest, RequestOptions.DEFAULT);
+
+    // 解析结果
+    List<Map<String, Object>> lists = new ArrayList<Map<String, Object>>();
+
+    for (SearchHit documentFields : response.getHits()) {
+        lists.add(documentFields.getSourceAsMap());
+    }
+    return lists;
+
+}
+```
+
+
+
+添加Controller
+
+```java
+@ResponseBody
+@RequestMapping(value = "/search/{keyword}/{pageNo}/{pageSize}", method = RequestMethod.GET, produces = "application/json; charset=utf-8")
+public Object search(@PathVariable("keyword") String keyword,
+                                        @PathVariable("pageNo") int pageNo,
+                                        @PathVariable("pageSize") int pageSize) throws Exception {
+    if (pageNo<0) {
+        throw new Exception("分页起始位置需要大于0");
+    }
+
+    if (pageSize<=0) {
+        throw new Exception("分页大小建议大于等于1");
+    }
+
+    List<Map<String, Object>> search = contentService.search(keyword, pageNo, pageSize);
+    Object s = JSON.toJSON(search);
+
+    return s;
+}
+```
+
+
+
+![image-20200817201228972](ElasticSearch.assets/image-20200817201228972.png)
+
+
+
+## 5、连接前端Vue
+
+### 5.1、导入js依赖
+
+![image-20200817201335140](ElasticSearch.assets/image-20200817201335140.png)
+
+
+
+
+
+### 5.2、修改html
+
+![image-20200817201421380](ElasticSearch.assets/image-20200817201421380.png)
+
+
+
+![image-20200817201501172](ElasticSearch.assets/image-20200817201501172.png)
+
+![image-20200817201531508](ElasticSearch.assets/image-20200817201531508.png)
+
+![image-20200817201711154](ElasticSearch.assets/image-20200817201711154.png)
+
+### 5.3、测试效果
+
+![image-20200817201725502](ElasticSearch.assets/image-20200817201725502.png)
+
+
+
+
+
+## 6、添加搜索关键字高亮
+
+**给搜索添加高亮**
+
+![image-20200817202111613](ElasticSearch.assets/image-20200817202111613.png)
+
+
+
+
+
+
+
+**解析高亮字段**
+
+![image-20200817202631994](ElasticSearch.assets/image-20200817202631994.png)
+
+
+
+
+
+
+
+**效果**
+
+![image-20200817202602396](ElasticSearch.assets/image-20200817202602396.png)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
