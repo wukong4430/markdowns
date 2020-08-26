@@ -3085,7 +3085,58 @@ employee.setBirth(parse);
 
 
 
-## X.1 jar 包部署 （默认）
+## X.1 前端Vue打包
+
+**一、安装依赖**
+
+```bash
+npm install --unsafe-perm --registry=https://registrt.npm.taobao.org
+```
+
+
+
+**二、编译打包**
+
+```bash
+npm run build:prod
+```
+
+
+
+**三、成品**
+
+![image-20200826143832599](SpringBoot.assets/image-20200826143832599.png)
+
+
+
+**四、nginx部署**
+
+进入nginx目录
+
+```bash
+cd /etc/nginx
+vim nginx.
+```
+
+![image-20200826144327171](SpringBoot.assets/image-20200826144327171.png)
+
+指向我们打包生成的dist目录。
+
+
+
+**启动nginx**
+
+```bash
+systemctl start nginx
+```
+
+
+
+
+
+
+
+## X.2 jar 包部署 （默认）
 
 > 清理缓存 + 打包
 
@@ -3106,9 +3157,26 @@ nohup java -jar xxx.jar &
 
 
 
+**遇到的问题**：无法连接到redis
+
+![image-20200826150945533](SpringBoot.assets/image-20200826150945533.png)
+
+可能的错误原因：
+
+- **查看有没有启动Redis服务器。**
+- **redis的配置application.yml（或application.properties）中
+    spring.redis.timeout连接超时时间（毫秒）中设置不能为0,
+    一般修改如下：spring.redis.timeout=5000。**
+- **找到redis的配置文件 redis.conf ： 执行 vim redis.conf
+    3.1 protected-mode yes 改为 protected-mode no (即该配置项表示是否开启保护模式，默认是开启，开启后Redis只会本地进行访问，拒绝外部访问)。
+    3.2 注释掉 bin127.0.0.1 即 #bin 127.0.0.1 (ps: 不注释掉，表示指定 redis 只接收来自于该 IP 地址的请求，注释掉后，则表示将处理所有请求)。**
+- **如果在Redis中没有配置requirepass ,那么在application.properties(或application.yaml)中就不要写spring.redis.password。**
+
+我出错的原因是第四个：Spirngboot中的 `application.yml`中设置了 spring.redis.password，但是服务器上的redis没有开启密码。这样就无法连接。
 
 
-## X.2 war包部署
+
+## X.3 war包部署
 
 
 
@@ -3142,7 +3210,7 @@ mvn clean
 mvn package
 ```
 
-> 就war包放入tomcat/WEBAPPS
+> 就war包放入/usr/local/tomcat/WEBAPPS
 
 
 
@@ -3152,6 +3220,10 @@ mvn package
 
 > 问题：无法通过ip：8080 直接访问，需要 /xxx
 
+![image-20200826154034870](SpringBoot.assets/image-20200826154034870.png)
+
+
+
 解决：加映射 <Host> 标签内
 
 ```bash
@@ -3160,11 +3232,13 @@ mvn package
 
 ![image-20200701173618657](SpringBoot.assets/image-20200701173618657.png)
 
-
+**作用**
 
 把webapps/ruoyi路径  映射到 /
 
-这样再访问 ip:8080就能直接访问到ruoyi项目！
+这样再访问 ip:8080就能直接访问到ruoyi（后台）项目！
+
+![image-20200826154026727](SpringBoot.assets/image-20200826154026727.png)
 
 
 
@@ -3174,7 +3248,7 @@ mvn package
 
 
 
-## X.3 小集群
+## X.4 小集群
 
 环境配置：
 
