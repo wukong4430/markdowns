@@ -750,11 +750,39 @@ case：
 
 
 
+> 面试常客
+
+**谈谈你对Zset的理解？**
+
+Zset的数据结构是一种跳表，即SkipList
+
+![img](Redis.assets/aHR0cHM6Ly9tbWJpei5xcGljLmNuL21tYml6X3BuZy80bzIyT0ZjbXpIa2liQ0hiaWJjanVRMlJSNUlUUnN4aWJpYWJRQ21HM2ljc09weGliSE1tQVZGVFRDdWZ5d1hUQ2g3NkRxZ3BvQ0dITEJkWmFoeUNpYlQ0SzBtbGcvNjQw)
+
+
+
+**Zset可以实现多关键字的排序吗**
+
+可以的。类似于MySQL中的以多个列为参数进行order by。
+
+（实际中，我们如果不要求实时性，可以每隔1分钟从MySQL中读取，排好序的List，存入Redis）
+
+如果我们就是要用Redis来实现，我们不会在Redis-cli中写入命令。都是通过Java连接Redis来做的，那么我们可以构造一个特殊的score，这个``score = function(x, y, z)` 用它来进行排序。 其实和Java中的多关键字排序类似。
+
+
+
+
+
 ## 三种特殊数据类型
 
 
 
 ### Geospatial 地理空间
+
+> 面试
+
+传入一个经度、纬度、地点名称。这样就构造了一个具有地理信息的地点。
+
+
 
 朋友的定位，附近的人
 
@@ -859,6 +887,18 @@ case：
 
 
 
+> 面试问题：Geospatial底层是用什么实现的？
+
+因为经常需要用到排序这个特性，Geo的底层其实是用Zset进行实现的。同时通过GetHash技术进行数值填充。因为本身输入的参数是有经度和纬度两个参数，我们需要借助GeoHash运算得到一个一维的长度为52的整数编码。将这个值作为score值输入Zset中。同样，在获取的时候，通过排序得到对应的Hash数值，再反解码得到经纬度。
+
+**总体流程**
+
+总之，Redis中处理这些地理位置坐标点的思想是：二维平面坐标点 --> 一维整数编码值 --> zset(score为编码值) --> zrangebyrank(获取score相近的元素)、zrangebyscore --> 通过score(整数编码值)反解坐标点 --> 附近点的地理位置坐标。
+
+
+
+
+
 ### Hyperloglog：用来计数
 
 > 什么是基数
@@ -871,9 +911,17 @@ B {1, 3, 5, 7, 8}
 
 
 
+看似和HashSet没有什么区别，都是用来做除重的。
+
+但当参与问题中的变量达到一定数量级的时候，再简单的问题都会变成一个难题。假设 APP 中日活用户达到`百万`或`千万以上级别`的话，我们采用 `HashMap` 的做法，就会导致程序中占用大量的内存。
+
+
+
+
+
 > 简介
 
-Redis 2.8.9 更新了hyperloglog的数据结构！它是用来做基数统计的算法！
+Redis 2.8.9 更新了hyperloglog的数据结构！它是用来做**基数统计**的算法！
 
 HyperLogLog 的优点是，在输入元素的数量或者体积非常非常大时，计算基数所需的空间总是固定 的、并且是很小的。
 
@@ -903,7 +951,7 @@ OK
 
 应用场景：
 
-- 统计计数，比如用户的访问数
+- 统计计数，比如用户的访问数。同一个用户的多次访问只算一次。
 
 
 
@@ -912,6 +960,10 @@ OK
 如果不允许一点错误，就使用set或者自己的数据类型。
 
 
+
+
+
+详细数学推导：https://juejin.im/post/6844903785744056333#heading-10
 
 
 
@@ -962,6 +1014,26 @@ setbit key offset value
 (integer) 6
 
 ```
+
+
+
+> 面试
+
+这个就是Redis实现的BloomFilter，BloomFilter非常简单，如下图所示，假设已经有3个元素a、b和c，分别通过3个hash算法h1()、h2()和h3()计算然后对一个bit进行赋值，接下来假设需要判断d是否已经存在，那么也需要使用3个hash算法h1()、h2()和h3()对d进行计算，然后得到3个bit的值，恰好这3个bit的值为1，这就能够说明：**d可能存在集合中**。再判断e，由于h1(e)算出来的bit之前的值是0，那么说明：**e一定不存在集合中**：
+
+![BloomFilter](Redis.assets/aHR0cHM6Ly9tbWJpei5xcGljLmNuL21tYml6X3BuZy80bzIyT0ZjbXpIa2liQ0hiaWJjanVRMlJSNUlUUnN4aWJpYWJ2bFlvZExpYjQwTGtPT3Q4U09tQktLRndXUXVaVW5WaWJNT0pQUXdnMkN2UW5Ka3FKV3FpYWlhaGJBLzY0MA)
+
+BloomFilter
+
+需要说明的是，bitmap并不是一种真实的数据结构，它本质上是**String**数据结构，只不过操作的粒度变成了位，即bit。因为String类型最大长度为512MB，所以bitmap最多可以存储2^32个bit。
+
+
+
+
+
+
+
+
 
 
 
@@ -1947,6 +2019,14 @@ repl_backlog_histlen:0
 SLAVEOF HOST PORT
 ```
 
+cli中恢复master（从slave）
+
+```bash
+SLAVEOF no one
+```
+
+
+
 
 
 在这个配置文件中配置后就是永久的主从关系了！
@@ -1965,11 +2045,12 @@ SLAVEOF HOST PORT
 
 > 复制原理
 
-Slave启动成功连接到master后会发送一个sync同步命令
+Slave**启动**并且**成功连接**到master后会发送一个sync同步命令
 
 Master接到命令，启动后台的存盘进程，同时收集所有接受到的用于修稿数据集命令，在后台进程执行完毕之后，master将传送的整个数据文件到slave，完成一次同步。
 
-- 全量复制：slave的服务在接受到数据库文件数据后，将其存盘并加载到内存中
+- 全量复制：Master将当前内存中的所有数据通过bgsave存到RDB文件中，发送给slave, slave的服务在接受到数据库文件数据后，将其存盘并加载到内存中。
+    - 从 Redis 2.8.18 版开始支持无盘复制，master一边遍历内存，一边将序列化的内容传递给slave
 - 增加复制：Master继续将新的所有收集到的修改命令依次传给slave，并完成同步
 
 ==但是只要是重新连接master，一次完全同步（全量复制）将被自动执行==
@@ -2194,7 +2275,55 @@ logfile "/data/bd/redis/sentinel/sentinel.log"
 
 ![image-20200801004801807](Redis.assets/image-20200801004801807.png)
 
+**Redis cluster**，主要是针对海量数据+高并发+高可用的场景。redis cluster 支撑 N 个 redis master node，每个 master node 都可以挂载多个 slave node。这样整个 redis 就可以横向扩容了。如果你要支撑更大数据量的缓存，那就横向扩容更多的 master 节点，每个 master 节点就能存放更多的数据了。
 
+
+
+集群模式和原理详细介绍 https://juejin.im/post/6844904039163887629
+
+
+
+捡几个重点的叙述一下：
+
+**slot（槽）**：总共是0-16384个，平均分配给每一个master。
+
+**各个master之间数据通信**：开启一个10000+6379端口，用p2p的方式在节点之间通信，最终达到数据一致。
+
+**处理请求**：Redis先计算key对应的槽，根据槽去寻找目标节点。
+
+**故障发现**：当某个节点A给另外一个节点B 发送ping信号时，没有pong响应。并判断当前时间和最后一次ping通的时间间隔超过阈值，主观下线；之后A开始在集群内部进行传播这个判断。如果集群中超过半数节点也ping不通B，那么就投票==>客观下线。
+
+**故障恢复**：
+
+- 资格检查：从节点和主节点的断线时间不能过长
+- 准备选举：让复制偏移量大的从节点优先发起选举
+- 选举投票：其他的master给投票，如果票数超过一半，就竞选。没有就再等下一个从节点
+- 替换master：成功竞选。
+
+
+
+**集群构建**：假设创建3个master、3个slave
+
+- 创建6个ip不同的节点，一开始都是master，之间也没有关系
+
+- ```bash
+    redis-cli --cluster create 127.0.0.1:6479 127.0.0.1:6480 127.0.0.1:6481 \
+    127.0.0.1:6482 127.0.0.1:6483  127.0.0.1:6484 --cluster-replicas 1
+    
+    ```
+
+    通过命令，能自动的创建master和slave
+
+- ![img](Redis.assets/16f7a345e5601e8b)
+
+- 
+
+**集群扩容**
+
+- add-node：添加一个新的节点
+- reshard：分配一定数量的槽。（成为master）
+- add-node：添加另一个新的节点
+- 绑定到新的master上。
 
 
 
@@ -2397,7 +2526,7 @@ Redis作为一个内存数据库，
 
 
 
-### 过期键的删除测率
+### 过期键的删除策略
 
 （1）：立即删除。在设置键的过期时间时，创建一个回调事件，当过期时间达到时，由时间处理器自动执行键的删除操作。
  （2）：惰性删除。键过期了就过期了，不管。每次从dict字典中按key取值时，先检查此key是否已经过期，如果过期了就删除它，并返回nil，如果没过期，就返回键值。
@@ -2539,6 +2668,19 @@ Sharding。
 - 增量同步
 
 ![image-20200801003105643](Redis.assets/image-20200801003105643.png)
+
+
+
+### 内部编码
+
+String、Set、Hash、List、Zset等都是对外的数据类型。Redis内部实现的话还有更细分的数据结构。
+
+![img](Redis.assets/aHR0cHM6Ly9tbWJpei5xcGljLmNuL21tYml6X3BuZy80bzIyT0ZjbXpIa2liQ0hiaWJjanVRMlJSNUlUUnN4aWJpYWJjdFYza1RiY093bmZ1aWJ1SDFRYmlhbDQwU0tUNnBweERqSUtpYmNDeVdIUDlpYVpwRDQzN3V6Y0JRLzY0MA)
+
+一种数据结构可能有多个不同的底层实现，这样做的好处是：
+
+- 如果底层代码需要更新，我们不需要去关注内部编码实现。使用过程没有任何变化
+- 在不同的应用场景下，可以通过设置去自主的选择不同的底层实现。提高性能。
 
 
 
