@@ -702,13 +702,27 @@ xml
 
 - 通过Resource加载mappler.xml
 - 生成一个inputStream输入流，创建 `sqlSessionFactoryBuilder` 对象
-- 通过 `sqlSessionFactory` 对象的 `builder(inputStream)` 方法，返回一个 `sqlSeesionfactory `对象
+- 通过 `sqlSessionFactoryBuilder` 对象的 `builder(inputStream)` 方法，返回一个 `sqlSeesionfactory `对象
 - 由 `sqlSessionFactory` 对象生成 `sqlSession` 
-- 通过 `statement id` 找到对应的 `statement`，通过传入的参数进行一系列的复杂判断生成要执行的 `sql`
+- 通过 mapper.xml 中的 `statement id` 找到对应的 `statement`，通过传入的参数进行一系列的复杂判断生成要执行的 `sql`
 - 通过 `jdbc` 执行 `sql` 
 - 把结果封装成 `map` \  `list` 返回
 
 
+
+
+
+### 什么是ORM
+
+ORM （Object Relational Mapping） 对象关系映射 是将 Java代码中的 POJO对象和数据库中的数据建立一个映射关系。可以通过程序自动化的持久化到关系型数据库中去。 
+
+
+
+### 你知道MyBatis是半自动的吗
+
+嗯。与Hibernate进行类比，Hibernate是全自动的ORM工具。使用Hibernate查询关联对象或者关联集合对象时，可以根据对象关系模型直接获取，所以它是全自动的。
+
+而Mybatis在查询关联对象或者关联集合对象时，**需要手动编写sql**来完成。
 
 
 

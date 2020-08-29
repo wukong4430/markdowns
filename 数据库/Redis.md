@@ -2285,6 +2285,8 @@ logfile "/data/bd/redis/sentinel/sentinel.log"
 
 捡几个重点的叙述一下：
 
+多master**上数据不一致**
+
 **slot（槽）**：总共是0-16384个，平均分配给每一个master。
 
 **各个master之间数据通信**：开启一个10000+6379端口，用p2p的方式在节点之间通信，最终达到数据一致。

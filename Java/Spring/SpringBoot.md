@@ -3274,3 +3274,91 @@ mvn package
 
 
 这样，通过访问前端 192.168.1.114:80，(前端去访问后台 192.168.1.115/116:8080) 就能实现所有功能。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 面试
+
+
+
+### SpringBoot 自动装配的逻辑
+
+在SpringBoot的主启动器上默认会带有一个注解  @SpringBootApplication
+
+这个注解接口是有三个另外的注解修饰
+
+- SpringBootConfiguration
+- EnanbleAutoConfiguration
+- ComponentScan
+
+第一个SpringBootConfiguration注解 再往底层走其实就是一个@Configuration
+
+第二个EnableAutoConfiguration是自动装配的核心。源码从外往里剖析我们 可以找到最终指向了一个方法叫做：
+
+`loadSpringFactories`，这个方法会通过 一个 final 修饰的字符串 `FACTORIES_RESOURCE_LOCATION`来加载所有的配置。
+
+这个 `FACTORIES_RESOURCE_LOCATION` 指向的路径是"META-INF/spring.factories" 这个是可以在SpringBoot的autoConfigure下找到的。
+
+
+
+所有的类都是以  xxxxAutoConfiguration 这样的命名结尾的。
+
+
+
+但并不是说在这个文件下的所有类就会都被自动装配到容器中。我们随便点开一个类就可以看到这些类上一般都会有一个 `ConditionalOnClass`的注解，说的是如果这个注解中的参数的类已经被装配进来的话，那么当前这个类也会被装配进来。相当于是一个前置的依赖。
+
+
+
+同时，在每一个 xxxxAutoConfiguration上呢，都会存在一个 加载 对应 xxxxProperties文件的注解。对应着每一个类的属性配置。
+
+比如说Spring的端口，是否开启缓存这些属性。
+
+
+
+### 你如何理解 Spring Boot 配置加载顺序？
+
+每一个SpringBoot的版本给出的配置加载顺序可能都是不同的，这个我在看早期的Springboot版本和现在2.0以后的版本时发现的。
+
+总共有将近20种优先级不同的方式加载配置。
+
+常见的就是：
+
+- 从application.properties 、 application.yaml 文件中加载
+- 从系统环境变量中加载
+- 从命令行参数加载
+- 或者是SpringTest的时候也可能添加配置
+
+
+
+之前提到的xxxxAutoConfiguration中的所有属性配置都是可以在 `application.yaml`中进行配置的。通过的 各个properties文件，一般只要指定对应的 前缀就可以了。
+
+
+
+
+
+
+
