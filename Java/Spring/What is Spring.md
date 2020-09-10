@@ -2051,5 +2051,5 @@ Spring AOP用的是动态代理模式；AspectJ AOP用的是静态代理模式�
 这两种动态代理的方式都是Spring AOP的具体实现方式。
 
 - JDK方式**只能提供接口**的代理，**不支持类**的代理。  有一个核心接口：InvocationHandler，和一个核心类 Proxy。 我们通过创建一个InvocationHandler，并且通过里面的 invoke() 方法 反射调用目标类中的代码，动态地将横切的逻辑和原本的业务编织在一起。接着我们利用Proxy类传入这个handler，动态地创建一个某个接口的实例，生成真正的代理对象。
-- 如果说代理类（Proxy）没有实现 InvocationHandler 接口，那么Spring AOP会选择使用CGLIB来动态代理类。 Code Generation Library 是一个代码生成的类库，可以在运行时动态的生成指定类的一个子类对象，并覆盖其中特定的方法并添加增强的代码。从而实现AOP。
+- 如果说代理类（Proxy）==没有==实现 InvocationHandler 接口，那么Spring AOP会选择使用CGLIB来动态代理类。 Code Generation Library 是一个代码生成的类库，可以在运行时动态的生成指定类的一个子类对象，并覆盖其中特定的方法并添加增强的代码。从而实现AOP。
 
