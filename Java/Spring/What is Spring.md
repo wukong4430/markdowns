@@ -2051,5 +2051,98 @@ Spring AOP用的是动态代理模式；AspectJ AOP用的是静态代理模式�
 这两种动态代理的方式都是Spring AOP的具体实现方式。
 
 - JDK方式**只能提供接口**的代理，**不支持类**的代理。  有一个核心接口：InvocationHandler，和一个核心类 Proxy。 我们通过创建一个InvocationHandler，并且通过里面的 invoke() 方法 反射调用目标类中的代码，动态地将横切的逻辑和原本的业务编织在一起。接着我们利用Proxy类传入这个handler，动态地创建一个某个接口的实例，生成真正的代理对象。
-- 如果说代理类（Proxy）==没有==实现 InvocationHandler 接口，那么Spring AOP会选择使用CGLIB来动态代理类。 Code Generation Library 是一个代码生成的类库，可以在运行时动态的生成指定类的一个子类对象，并覆盖其中特定的方法并添加增强的代码。从而实现AOP。
 
+- 如果说代理类（Proxy）==没有==实现 InvocationHandler 接口，那么Spring AOP会选择使用CGLIB来动态代理类。Cglib可以用来直接代理类，而不是需要接口。 Code Generation Library 是一个代码生成的类库，可以在运行时动态的生成指定类的一个子类对象，并覆盖其中特定的方法并添加增强的代码。从而实现AOP。
+
+    ```java
+    class Student {
+    	private String name = "zhangsan";
+    	public String getStuName() {
+    		return name;
+    	}
+    }
+    // Cglib代理
+    public void testx() {
+       //创建一个Enhancer对象
+       Enhancer enchaner = new Enhancer();
+       //设置被代理的类
+       enchaner.setSuperclass(Student.class);
+       //创建一个回调接口
+       Callback interceptor = new MethodInterceptor() {
+    
+          @Override
+          public Object intercept(Object obj, Method method, Object[] args, MethodProxy proxy)
+                throws Throwable {
+             System.err.println("原方法名是 ： " + method.getName());
+             System.err.println("原方法声明的类为 " + method.getDeclaringClass());
+              // 对应实际调用的getStuName
+             System.err.println("我是 " + (String) proxy.invokeSuper(obj, args));
+             System.err.println("我调用结束了");
+             return null;
+          }
+       };
+       enchaner.setCallback(interceptor);
+       Student student = (Student) enchaner.create();
+       student.getStuName();
+    
+    }
+    原方法名是 ： getStuName
+    原方法声明的类为 class com.neo.Student
+    我是 zhangsan
+    我调用结束了
+    ```
+
+    在调用`getStuName`前后，进行了一个拦截。添加了一些新的方法。
+
+    
+
+    
+
+    ```java
+    public void test2() {
+       //创建一个Enhancer对象
+       Enhancer enchaner = new Enhancer();
+       //设置被代理的类
+       enchaner.setSuperclass(Student.class);
+    
+       //创建一个回调接口
+       Callback interceptor = new MethodInterceptor() {
+    
+          @Override
+          public Object intercept(Object obj, Method method, Object[] args, MethodProxy proxy)
+                throws Throwable {
+             System.err.println("原方法名是 ： " + method.getName());
+             System.err.println("原方法声明的类为 " + method.getDeclaringClass());
+             System.err.println("我是 " + (String) proxy.invokeSuper(obj, args));
+             System.err.println("我调用结束了");
+             return proxy.invokeSuper(obj, args);
+          }
+       };
+       CallbackFilter callbackFilter = new CallbackFilter() {
+    
+          @Override
+          public int accept(Method method) {
+             if ("getStuName".equals(method.getName())) {
+                System.err.println("我将此方法过滤掉了，不对该方法进行拦截");
+                return 1;
+             }
+             return 0;
+          }
+       };
+       Callback[] callbacks = new Callback[] { interceptor, NoOp.INSTANCE };
+       enchaner.setCallbackFilter(callbackFilter);
+       enchaner.setCallbacks(callbacks);
+       Student student = (Student) enchaner.create();
+       System.err.println(student.getStuName());
+       System.err.println(student.getRename());
+    }
+    我将此方法过滤掉了，不对该方法进行拦截
+    zhangsan
+    原方法名是 ： getRename
+    原方法声明的类为 class com.neo.Student
+    我是 rename
+    我调用结束了
+    rename
+    ```
+
+    第二个例子是设置：哪些方法进行代理，代理的方式是什么，哪些方法不使用代理（NoOp.INSTANCE)
