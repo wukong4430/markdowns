@@ -263,3 +263,38 @@ Compose 中有两个重要的概念：
 
 - 服务 (service) ：一个应用的容器，实际上可以包括若干运行相同镜像的容器实例。
 - 项目 (project) ：由一组关联的应用容器组成的一个完整业务单元，在 docker-compose.yml 文件中定义。
+
+
+
+
+
+
+
+
+
+# 面试
+
+### Docker的四种网络模式是啥
+
+
+
+我们在使用docker run创建Docker容器时，可以用--net选项指定容器的网络模式，Docker有以下4种网络模式：
+
+**· host模式，使用--net=host指定。**
+
+**· container模式，使用--net=container:NAME_or_ID指定。**
+
+**· none模式，使用--net=none指定。**
+
+**· bridge模式，使用--net=bridge指定，默认设置。**
+
+
+
+Docker中我们一般会使用NameSpace来做资源的隔离。因为Docker是跑在物理服务器上的（宿主机）。隔离的方式有PID的进程隔离，Mount的文件系统隔离，Network的网络隔离。
+
+Netword Namespace提供了一份独立的网络环境，包括网卡、路由、Iptable规则等。能够与其他的Network namespace进行隔离。
+
+
+
+
+
