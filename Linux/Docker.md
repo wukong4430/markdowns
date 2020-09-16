@@ -296,5 +296,21 @@ Netword Namespace提供了一份独立的网络环境，包括网卡、路由、
 
 
 
+当我们使用 host 模式， 容器不会获得一个独立的Network Namespace，容器和宿主机是共用一套网络系统。
+
+
+
+当使用Container模式，新创建的容器和指定的容器公用一套Network Namespace，而不是与宿主机共享。
+
+
+
+None模式就需要我们手动地为一个容器配置IP、添加网卡、处理路由信息。
+
+
+
+Bridge模式。也就是桥模式。每一个容器都会有一个Network Namespace，需要独立设置IP。并将主机上的Docker容器连接到一个虚拟网桥上。
+
+
+
 
 

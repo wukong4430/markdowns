@@ -2153,3 +2153,36 @@ Spring AOP用的是动态代理模式；AspectJ AOP用的是静态代理模式�
 
 ### Bean 的生命周期
 
+
+
+**有啥用？**
+
+Spring容器可以管理singleton作用域的生命周期，在此作用域下，Spring精确地知道Bean何时被创建，何时初始化完成，以及何时被销毁。
+
+
+
+而对于`prototype`作用域的Bean，Spring只负责创建，当容器创建了Bean的实例后，Bean的实例就交给客户端代码管理，Spring容器将不再跟踪其生命周期。每次客户端请求`prototype`作用域的Bean时，Spring容器都会创建一个新的实例，并且不会管那些配置成`prototype`的实例。
+
+
+
+当一个Bean被加载的Spring容器中来时，它就拥有了生命。而Spring在保证一个Bean能够使用之前，需要完成许多必要的工作。
+
+![Bean的生命周期](What is Spring.assets/5-1ZF1100325116.png)
+
+
+
+
+
+1、根据配置调用Bean的构造方法、工厂方法实例化Bean
+
+2、设置属性值。DI 依赖注入，利用依赖注入完成Bean中的所有属性值的配置注入
+
+3、如果Bean实现了 `BeanNameAware` 接口，则Spring调用Bean的 `setBeanName()`方法传入当前的Bean的id值。
+
+4、如果Bean实现了`BeanFactoryAware`接口，则Spring调用 `setBeanFactory()` 方法传入当前工厂实例的引用。	
+
+​	==补充==： xxxAware接口，类似于反射。是让Bean可以了解到Spring容器对其进行管理的细节。不然只要容器单方面的管理Bean，而Bean却无法得知一些关于Factory、Spring的信息。
+
+5、如果 Bean 实现了 `ApplicationContextAware` 接口，则 Spring 调用 `setApplicationContext()` 方法传入当前 ApplicationContext 实例的引用。
+
+6、如果 `BeanPostProcessor` 和 Bean 关联，则 Spring 将调用该接口的预初始化方法 `postProcessBeforeInitialzation()` 对 Bean 进行加工操作，此处非常重要，Spring 的 AOP 就是利用它实现的。
