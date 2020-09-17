@@ -2186,3 +2186,13 @@ Spring容器可以管理singleton作用域的生命周期，在此作用域下�
 5、如果 Bean 实现了 `ApplicationContextAware` 接口，则 Spring 调用 `setApplicationContext()` 方法传入当前 ApplicationContext 实例的引用。
 
 6、如果 `BeanPostProcessor` 和 Bean 关联，则 Spring 将调用该接口的预初始化方法 `postProcessBeforeInitialzation()` 对 Bean 进行加工操作，此处非常重要，Spring 的 AOP 就是利用它实现的。
+
+7、如果Bean实现了 `InitializationBean`接口，则Spring将调用 `afterPropertiesSet()` 方法
+
+8、如果在配置文件中通过 init-method 属性指定了初始化方法，则调用该初始化方法。
+
+9、如果 BeanPostProcessor 和 Bean 关联，则 Spring 将调用该接口的初始化方法 postProcessAfterInitialization()。此时，Bean 已经可以被应用系统使用了。
+
+10、如果在 <bean> 中指定了该 Bean 的作用范围为 scope="singleton"，则将该 Bean 放入 Spring IoC 的缓存池中，将触发 Spring 对该 Bean 的生命周期管理；如果在 <bean> 中指定了该 Bean 的作用范围为 scope="prototype"，则将该 Bean 交给调用者，调用者管理该 Bean 的生命周期，Spring 不再管理该 Bean。
+
+11、如果 Bean 实现了 DisposableBean 接口，则 Spring 会调用 destory() 方法将 Spring 中的 Bean 销毁；如果在配置文件中通过 destory-method 属性指定了 Bean 的销毁方法，则 Spring 将调用该方法对 Bean 进行销毁。
