@@ -176,6 +176,16 @@ git log --pretty=oneline/full/fuller/short
 
 ## 撤销操作
 
+### 从暂存区撤出
+
+提示使用 git reset HEAD <file> 来取消缓存区的修改。
+
+```bash
+git reset HEAD <file>
+```
+
+
+
 
 
 
@@ -260,6 +270,18 @@ origin
 
 
 
+### 删除分支
+
+```bash
+# 删除本地分支
+git branch -d <branchName>
+
+# 删除远程分支
+git push origin --delete <branchName>
+```
+
+
+
 
 
 ### 合并
@@ -268,17 +290,113 @@ origin
 
 
 
+#### 场景介绍
+
+我们创建了两个分支，一个master、一个feature
+
+![初始分支提交记录](Git.assets/16342fb2f90d2667)
+
+两个分支交替的进行了commit。每个分支分别有4个commit。
+
+
+
+在master分支中，文本的内容是
+
+![初始 master 分支内容](Git.assets/16342fb8a5639c36)
+
+在feautre分支中，文本的内容是
+
+![初始 feature 分支内容](Git.assets/16342fb9bfb81fe5)
+
+
+
 #### merge
 
+```bash
+# 将feature分支的内容（4个commit）合并到master
+git checkout master
+git merge feature
+```
 
+合并完成之后，会按照时间顺序，将feature分支上的commit和master分支上的commit都杂糅在一起。
+
+不管是主分支还是特征分支上的每一个commit都会被记录，最后合并的时候还需要额外创建一个commit来记录。
+
+![使用 `git merge` 之后的分支提交记录](Git.assets/16342fc20a5fe006)
+
+**优点：**信息非常详细。不会遗漏任何一条提交记录。
+
+**缺点：**试想，我们对于一个小功能的修改就提交了很多次，那么在做代码回滚的时候，需要查看很多很多的commit，比较消耗时间和精力。
 
 
 
 #### rebase
 
+```bash
+# 同样也是将feature分支的commit合并到master上
+git checkout feature
+# 开始变基
+git rebase master
+```
+
+当执行完 `git rebase master` 之后，会将文件中冲突的地方标识出来，需要自己对冲突进行操作之后，再执行
+
+```bash
+# 修改冲突后，继续执行
+# 先把修改后的内容add
+git add <file>
+git rebase --continue
+```
+
+如果还有冲突，重复上面的步骤继续解决就可以。直到解决完毕所有的冲突。
+
+然后到master分支上进行合并
+
+```bash
+# 合并
+git checkout master
+git merge feature
+```
+
+![完成 `git rebase`后再merge](Git.assets/16342fc60604de29)
 
 
 
+这样feature上的所有提交信息也还是会全部显示在 `git log`中。
+
+
+
+但是，我们可以通过交互模式，将多个feature中的commit合并成一个或者少数个。
+
+```bash
+# 开启rebase 交互模式
+# 选取最近的四个commit （来自feauture）
+git rebase -i HEAD~4
+```
+
+会跳出来这么一个界面
+
+![head rebase](Git.assets/16342fc6eceb5050)
+
+上面代表的是四个commit，通过修改原本的 `pick` 选取对应的方法。
+
+通常我们用 `s (squash)` 来进行分支的合并。
+
+我只保留一个commit
+
+那么最终就 log
+
+![image-20200927174039718](Git.assets/image-20200927174039718.png)
+
+
+
+
+
+#### 总结
+
+- 当我们需要保留非常详细的各个分支上的commit记录时，我们最好就使用 `git merge` ，既方便，也简单。
+
+- 当发现自己修改某个功能时，频繁进行了`git commit`提交时，发现其实过多的提交信息没有必要时，可以尝试`git rebase`。
 
 ```bash
 1
