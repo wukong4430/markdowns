@@ -176,13 +176,56 @@ git log --pretty=oneline/full/fuller/short
 
 ## 撤销操作
 
+> 只要一个文件跟Git联系过一次（add commit过）那么基本上都是可以找回丢失的文件的
+
+
+
 ### 从暂存区撤出
 
-提示使用 git reset HEAD <file> 来取消缓存区的修改。
+添加了两个新的文件 `revoke1.txt` 和 `revoke2.txt`。 现在希望从暂存区中撤去一个。
 
 ```bash
-git reset HEAD <file>
+# 确认目前的状态
+git status
 ```
+
+![image-20201001154053149](Git.assets/image-20201001154053149.png)
+
+git 提示了我们可以使用 `git restore --staged <file>` 命令来撤销。
+
+
+
+### 撤销对文件的修改
+
+当我们修改了一个文件
+
+![image-20201001154444594](Git.assets/image-20201001154444594.png)
+
+可以看到 README.md 已经被我们修改了。但是我突然不想要这些修改了。想丢弃，怎么办呢？
+
+- 第一种办法，就是手动的去修改源文件。把之前修改过的地方一个一个的都撤销掉。（得撤销很多次）
+- 第二种办法，git status 给了我们提示：`git restore <file>` 就可以将该文件的所有修改丢弃。
+
+
+
+
+
+### 将遗漏的文件合并到上一次的提交
+
+有时候我们提交完了才发现漏掉了几个文件没有添加，或者提交信息写错了。 此时，可以运行带有 `--amend` 选项的提交命令来重新提交：
+
+```bash
+git commit -m "提交新的文件"
+# 想起来好像有一个文件忘记提交了
+# 添加这个文件
+git add new.txt
+# 使用--amend 回到上一次的提交
+$ git commit --amend
+```
+
+![image-20201001151146178](Git.assets/image-20201001151146178.png)
+
+这样，会将新添加的 `new.txt` 文件 和 上次提交的所有内容认为是同一次提交。
 
 
 
@@ -238,6 +281,27 @@ git push origin master
 > 只有当你有所克隆服务器的写入权限，并且之前没有人推送过时，这条命令才能生效。
 >
 > 如果push时，其他协作者已经push过了。则必须先fetch最新的内容进行合并后才能push。
+
+
+
+- **假设有两个远程分支oschina和github**
+
+****
+
+```bash
+#添加github
+git remote add origin https://github.com/xxx(仓库地址)
+#添加oschina
+git remote add oschina https://git.oschina.net/xxxx(仓库地址)
+#提交到oschina
+git push oschina master(分支名)
+#提交到github
+git push origin master(分支名)
+#从oschina更新
+git pull oschina master
+#从github更新
+git pull origin master
+```
 
 
 
