@@ -271,6 +271,34 @@ git pull
 
 
 
+`git remote show`命令加上主机名，可以查看该主机的详细信息。
+
+> ```javascript
+> $ git remote show <主机名>
+> ```
+
+`git remote add`命令用于添加远程主机。
+
+> ```javascript
+> $ git remote add <主机名> <网址>
+> ```
+
+`git remote rm`命令用于删除远程主机。
+
+> ```javascript
+> $ git remote rm <主机名>
+> ```
+
+`git remote rename`命令用于远程主机的改名。
+
+> ```javascript
+> $ git remote rename <原主机名> <新主机名>
+> ```
+
+
+
+
+
 - **推送到远程**
 
 ```bash
@@ -328,6 +356,8 @@ origin
 
 
 
+
+
 ## 别名
 
 给 commit \ status \  checkout \  branch 起一个简短的名字
@@ -341,6 +371,8 @@ git config --global alias.st status
 git config --global alias.last "log -1 HEAD"
 # 显示所有分支的log
 git config --global alias.showlig "log --oneline --decorate --graph --all"
+# list all aliases
+git config --global alias.alias "config --get-regexp ^alias\."
 ```
 
 
@@ -637,6 +669,98 @@ git branch -d iss53
 ```
 
 最后将`iss53`分支删除。
+
+
+
+### 远程分支
+
+获得远程引用的完整列表
+
+```bash
+git ls-remote <remote>
+git remote show <remote>
+```
+
+
+
+初始化clone的图示
+
+![克隆之后的服务器与本地仓库。](Git.assets/remote-branches-1.png)
+
+
+
+其他人推送新的提交到远程仓库后，我`git fetch` 后图示 （我本地也做了一些修改）
+
+![`git fetch` 更新你的远程仓库引用。](Git.assets/remote-branches-3.png)
+
+
+
+`git fetch`操作之后不会对本地库产生任何的影响，我们需要通过后续的操作来 **合并** 或者 创建一个本地分支来于之对应。
+
+一般来说，我们都会
+
+```bash
+# 将fetch下来的远程分支(master)信息合并到本地
+git merge origin/master
+
+# 创建一个新的本地分支
+git checkout -b newBranch origin/master
+```
+
+
+
+`git pull` 是取回远程主机的某个分支的更新，再与本地的指定分支合并。它的完整格式其实是比较复杂的。
+
+```bash
+# 这个是最完整的git pull 命令
+$ git pull <远程主机名> <远程分支名>:<本地分支名>
+```
+
+比如，取回`origin`主机的`next`分支，与本地的`master`分支合并，需要写成下面这样。
+
+```bash 
+git pull origin next:master
+```
+
+pull命令可以进行简化
+
+```bash
+# 如果远程分支是与当前分支合并，则冒号后面的部分可以省略。
+git pull origin next # 把远程的origin仓库的next分支merge到本地当前分支
+# 如果本地当前分支与远程分支已经存在追踪关系，那么可以省略分支名
+git pull origin
+# 如果当前分支只有一个追踪分支，那么远程主机名也可以省略
+git pull
+```
+
+如果远程主机上的某个分支已经被人删除，这个时候使用 `git pull`是不会出现任何效果的。这是为了误删本地分支的内容。
+
+如果需要同步这个删除，可以使用 `-p` 参数
+
+```bash
+$ git pull -p
+# 等同于下面的命令
+$ git fetch --prune origin 
+$ git fetch -p
+```
+
+
+
+
+
+### 分支跟踪
+
+当我们使用`git clone` 命令的时候，Git会自动在本地分支与远程分支之间建立一种追踪关系（tracking）。
+
+`本地master->远程origin/master`
+
+Git也允许我们手动地创建追踪关系
+
+```bash
+# 设置上游分支
+# 指定本地master分支追踪 origin/branchName
+git br --set-upstream master origin/branchName
+```
 
 
 
