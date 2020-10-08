@@ -176,13 +176,56 @@ git log --pretty=oneline/full/fuller/short
 
 ## 撤销操作
 
+> 只要一个文件跟Git联系过一次（add commit过）那么基本上都是可以找回丢失的文件的
+
+
+
 ### 从暂存区撤出
 
-提示使用 git reset HEAD <file> 来取消缓存区的修改。
+添加了两个新的文件 `revoke1.txt` 和 `revoke2.txt`。 现在希望从暂存区中撤去一个。
 
 ```bash
-git reset HEAD <file>
+# 确认目前的状态
+git status
 ```
+
+![image-20201001154053149](Git.assets/image-20201001154053149.png)
+
+git 提示了我们可以使用 `git restore --staged <file>` 命令来撤销。
+
+
+
+### 撤销对文件的修改
+
+当我们修改了一个文件
+
+![image-20201001154444594](Git.assets/image-20201001154444594.png)
+
+可以看到 README.md 已经被我们修改了。但是我突然不想要这些修改了。想丢弃，怎么办呢？
+
+- 第一种办法，就是手动的去修改源文件。把之前修改过的地方一个一个的都撤销掉。（得撤销很多次）
+- 第二种办法，git status 给了我们提示：`git restore <file>` 就可以将该文件的所有修改丢弃。
+
+
+
+
+
+### 将遗漏的文件合并到上一次的提交
+
+有时候我们提交完了才发现漏掉了几个文件没有添加，或者提交信息写错了。 此时，可以运行带有 `--amend` 选项的提交命令来重新提交：
+
+```bash
+git commit -m "提交新的文件"
+# 想起来好像有一个文件忘记提交了
+# 添加这个文件
+git add new.txt
+# 使用--amend 回到上一次的提交
+$ git commit --amend
+```
+
+![image-20201001151146178](Git.assets/image-20201001151146178.png)
+
+这样，会将新添加的 `new.txt` 文件 和 上次提交的所有内容认为是同一次提交。
 
 
 
@@ -228,6 +271,34 @@ git pull
 
 
 
+`git remote show`命令加上主机名，可以查看该主机的详细信息。
+
+> ```javascript
+> $ git remote show <主机名>
+> ```
+
+`git remote add`命令用于添加远程主机。
+
+> ```javascript
+> $ git remote add <主机名> <网址>
+> ```
+
+`git remote rm`命令用于删除远程主机。
+
+> ```javascript
+> $ git remote rm <主机名>
+> ```
+
+`git remote rename`命令用于远程主机的改名。
+
+> ```javascript
+> $ git remote rename <原主机名> <新主机名>
+> ```
+
+
+
+
+
 - **推送到远程**
 
 ```bash
@@ -238,6 +309,27 @@ git push origin master
 > 只有当你有所克隆服务器的写入权限，并且之前没有人推送过时，这条命令才能生效。
 >
 > 如果push时，其他协作者已经push过了。则必须先fetch最新的内容进行合并后才能push。
+
+
+
+- **假设有两个远程分支oschina和github**
+
+****
+
+```bash
+#添加github
+git remote add origin https://github.com/xxx(仓库地址)
+#添加oschina
+git remote add oschina https://git.oschina.net/xxxx(仓库地址)
+#提交到oschina
+git push oschina master(分支名)
+#提交到github
+git push origin master(分支名)
+#从oschina更新
+git pull oschina master
+#从github更新
+git pull origin master
+```
 
 
 
@@ -266,7 +358,82 @@ origin
 
 
 
-## 分支
+## 别名
+
+给 commit \ status \  checkout \  branch 起一个简短的名字
+
+```bash
+git config --global alias.co checkout
+git config --global alias.br branch
+git config --global alias.ct commit
+git config --global alias.st status
+# 显示最近的一次commit
+git config --global alias.last "log -1 HEAD"
+# 显示所有分支的log
+git config --global alias.showlig "log --oneline --decorate --graph --all"
+# list all aliases
+git config --global alias.alias "config --get-regexp ^alias\."
+```
+
+
+
+
+
+
+
+
+
+## 分支 branch
+
+### 基础介绍
+
+每一次commit都会创建一个指针节点，指向父节点（上一次的commit）。而每次保存的是一个当前数据的快照（Snapshot）
+
+![提交对象及其父对象。](Git.assets/commits-and-parents.png)
+
+
+
+而我们熟知的`master`分支是默认创建的。
+
+![分支及其提交历史。](Git.assets/branch-and-history.png)
+
+当我们创建一个新的分支时
+
+```bash
+git branch testing
+```
+
+![两个指向相同提交历史的分支。](Git.assets/two-branches.png)
+
+有两个指针指向了同一个 commit的快照
+
+**那么，我们如何确定当前时是处于哪个分支呢？**  ==HEAD指针==
+
+![HEAD 指向当前所在的分支。](Git.assets/head-to-master.png)
+
+我们用HEAD这个特殊指针来指示到底是哪一个分支。
+
+> 由于 Git 的分支实质上仅是包含所指对象校验和（长度为 40 的 SHA-1 值字符串）的文件，所以它的创建和销毁都异常高效。 创建一个新分支就相当于往一个文件中写入 41 个字节（40 个字符和 1 个换行符），如此的简单能不快吗？
+
+
+
+### 切换分支
+
+```bash
+git checkout testing
+```
+
+![HEAD 指向当前所在的分支。](Git.assets/head-to-testing.png)
+
+
+
+在`testing`分支上提交一次新的commit
+
+![HEAD 分支随着提交操作自动向前移动。](Git.assets/advance-testing.png)
+
+切换回master
+
+![检出时 HEAD 随之移动。](Git.assets/checkout-master.png)
 
 
 
@@ -284,7 +451,7 @@ git push origin --delete <branchName>
 
 
 
-### 合并
+### 分支合并
 
 在git中，有两种方式可以将一个branch合并到另一个branch上。
 
@@ -395,8 +562,209 @@ git rebase -i HEAD~4
 #### 总结
 
 - 当我们需要保留非常详细的各个分支上的commit记录时，我们最好就使用 `git merge` ，既方便，也简单。
-
 - 当发现自己修改某个功能时，频繁进行了`git commit`提交时，发现其实过多的提交信息没有必要时，可以尝试`git rebase`。
+
+
+
+
+
+#### 实际应用
+
+1. 开发某个网站。
+2. 为实现某个新的用户需求，创建一个分支。
+3. 在这个分支上开展工作。
+
+正在此时，你突然接到一个电话说有个很严重的问题需要紧急修补。 你将按照如下方式来处理：
+
+1. 切换到你的线上分支（production branch）。
+2. 为这个紧急任务新建一个分支，并在其中修复它。
+3. 在测试通过之后，切换回线上分支，然后合并这个修补分支，最后将改动推送到线上分支。
+4. 切换回你最初工作的分支上，继续工作。
+
+
+
+`master`作为主（线上）分支，我正在`iss53`这个分支上开展工作，如图
+
+![`iss53` 分支随着工作的进展向前推进。](Git.assets/basic-branching-3.png)
+
+
+
+突然，需要去修复线上分支的一个bug
+
+首先，确保`iss53`这个分支的任务都已经提交
+
+```bash
+git st
+git commit -a 
+```
+
+然后切换回`master`分支
+
+```bash
+git checkout master
+```
+
+开始创建紧急修复分支，并处理完所有的任务
+
+```bash
+$ git checkout -b hotfix
+Switched to a new branch 'hotfix'
+$ vim index.html
+$ git commit -a -m 'fixed the broken email address'
+[hotfix 1fb7853] fixed the broken email address
+ 1 file changed, 2 insertions(+)
+```
+
+![基于 `master` 分支的紧急问题分支（hotfix branch）。](Git.assets/basic-branching-4.png)
+
+测试确保所有的任务都是执行通过的，接着切换回`master` 进行合并。
+
+```bash
+$ git checkout master
+$ git merge hotfix
+Updating f42c576..3a0874c
+Fast-forward
+ index.html | 2 ++
+ 1 file changed, 2 insertions(+)
+```
+
+![`master` 被快进到 `hotfix`。](https://git-scm.com/book/en/v2/images/basic-branching-5.png)
+
+`merge`会将所有commit的信息都详细地记录下来。当完成合并之后，`hotfix`分支也就不需要了，可以删除。那么分支情况会如下所示
+
+```bash
+git branch -d hotfix
+```
+
+![继续在 `iss53` 分支上的工作。](Git.assets/basic-branching-6.png)
+
+接着，继续`iss53`的工作，完成后，切换回`master`并将分支进行合并。因为 `iss53`不是从C4分出来的，而是更早的C2，因此，他们之间会存在冲突（hotfix修改的部分）。这样的合并不是一个简单的`fast-forward`，而会自动地新建一个commit。如下
+
+![一个合并提交。](Git.assets/basic-merging-2.png)
+
+出现冲突后，文件中会出现类似
+
+```html
+<<<<<<< HEAD:index.html
+<div id="footer">contact : email.support@github.com</div>
+=======
+<div id="footer">
+ please contact us at support@github.com
+</div>
+>>>>>>> iss53:index.html
+```
+
+`=======` 上方的内容是当前HEAD（master）中的内容；`========`下方的内容是合并进来的冲突内容。我们进行取舍。修改成
+
+```html
+<div id="footer">contact : email.support@github.com</div>
+```
+
+解决冲突后，
+
+```bash
+git add <file>
+git commit -m "conflicts solved, merge branches"
+git branch -d iss53
+```
+
+最后将`iss53`分支删除。
+
+
+
+### 远程分支
+
+获得远程引用的完整列表
+
+```bash
+git ls-remote <remote>
+git remote show <remote>
+```
+
+
+
+初始化clone的图示
+
+![克隆之后的服务器与本地仓库。](Git.assets/remote-branches-1.png)
+
+
+
+其他人推送新的提交到远程仓库后，我`git fetch` 后图示 （我本地也做了一些修改）
+
+![`git fetch` 更新你的远程仓库引用。](Git.assets/remote-branches-3.png)
+
+
+
+`git fetch`操作之后不会对本地库产生任何的影响，我们需要通过后续的操作来 **合并** 或者 创建一个本地分支来于之对应。
+
+一般来说，我们都会
+
+```bash
+# 将fetch下来的远程分支(master)信息合并到本地
+git merge origin/master
+
+# 创建一个新的本地分支
+git checkout -b newBranch origin/master
+```
+
+
+
+`git pull` 是取回远程主机的某个分支的更新，再与本地的指定分支合并。它的完整格式其实是比较复杂的。
+
+```bash
+# 这个是最完整的git pull 命令
+$ git pull <远程主机名> <远程分支名>:<本地分支名>
+```
+
+比如，取回`origin`主机的`next`分支，与本地的`master`分支合并，需要写成下面这样。
+
+```bash 
+git pull origin next:master
+```
+
+pull命令可以进行简化
+
+```bash
+# 如果远程分支是与当前分支合并，则冒号后面的部分可以省略。
+git pull origin next # 把远程的origin仓库的next分支merge到本地当前分支
+# 如果本地当前分支与远程分支已经存在追踪关系，那么可以省略分支名
+git pull origin
+# 如果当前分支只有一个追踪分支，那么远程主机名也可以省略
+git pull
+```
+
+如果远程主机上的某个分支已经被人删除，这个时候使用 `git pull`是不会出现任何效果的。这是为了误删本地分支的内容。
+
+如果需要同步这个删除，可以使用 `-p` 参数
+
+```bash
+$ git pull -p
+# 等同于下面的命令
+$ git fetch --prune origin 
+$ git fetch -p
+```
+
+
+
+
+
+### 分支跟踪
+
+当我们使用`git clone` 命令的时候，Git会自动在本地分支与远程分支之间建立一种追踪关系（tracking）。
+
+`本地master->远程origin/master`
+
+Git也允许我们手动地创建追踪关系
+
+```bash
+# 设置上游分支
+# 指定本地master分支追踪 origin/branchName
+git br --set-upstream master origin/branchName
+```
+
+
+
+
 
 ```bash
 1
