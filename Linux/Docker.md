@@ -1,4 +1,4 @@
-#  什么是Docker
+#  一、什么是Docker
 
 
 
@@ -8,7 +8,7 @@
 
 
 
-# 为什么使用Docker
+# 二、为什么使用Docker
 
 
 
@@ -34,7 +34,7 @@
 
 
 
-# Docker 架构概念
+# 三、Docker 架构概念
 
 Docker是CS架构，主要有**两个**概念：
 
@@ -61,75 +61,164 @@ Docker的三个组成部件：
 
 
 
-# 常用命令
+# 四、Docker的基本操作
 
-拉取docker镜像
 
+
+## 4.1 安装Docker （CentOS)
+
+> 1. **下载关于Docker的依赖环境**
+>
+>    yum -y install yum-utils device-mapper-persistent-data lvm2
+
+> 2. **设置Docker的镜像源**
+>
+>    yum-config-manager --add-repo http://mirros.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+
+> 3. **安装Docker**
+>
+>    yum makecache fast
+>
+>    yum -y install docker-ce
+
+> 4. **启动，并设置为开机启动，测试**
+>
+>    systemctl start docker
+>
+>    systemctl enable docker (开机启动)
+>
+>    docker run hello-world(测试)
+
+## 4.2 Docker的中央仓库（registry）
+
+> 1. Docker官方的中央仓库：这个仓库的镜像是最全的，但是下载速度比较慢
+>
+>    1. https://hub.docker.com
+>
+> 2. 国内的镜像网站：网易蜂巢、daoCloud.
+>
+>    1. https://hub.daocloud.io/
+>    2. https://c.163yun.com/hub#/home （需要登录）
+>
+> 3. 公司私有Docker镜像 （添加配置）
+>
+>    1. 需要在 `/etc/docker/daemon.json`添加如下
+>
+>       ```json
+>       {
+>           "registry-mirrors": ["https://registry.docker-cn.com"],
+>           "insecure-registries": ["ip:port"]
+>       }
+>       # 重启两个服务
+>       systemctl daemon-reload
+>       systemctl restart docker
+>       ```
+>
+>       
+
+## 4.3 镜像的操作
+
+```shell
+# 1.拉取镜像到本地
+docker pull 镜像名称[:tag]
+# 举个例子
+docker pull tomcat （默认是去中央仓库拉取）
+docker pull daocloud.io/library/tomcat:8.5.15-jre8 (指定镜像仓库)
 ```
-docker pull image_name
+
+```shell
+# 2. 查看全部本地镜像
+docker images / docker image ls
 ```
 
-查看宿主机上的镜像，Docker镜像保存在/var/lib/docker目录下:
-
-```
-docker images
-```
-
-删除镜像
-
-```
-docker rmi  docker.io/tomcat:7.0.77-jre7   或者  docker rmi b39c68b7af30
+```shell
+# 3.删除镜像
+docker rmi 镜像的标识
 ```
 
-查看当前有哪些容器正在运行
+```shell
+# 4.镜像的导入导出
+# 如果从中央仓库\其他仓库中去下载，总有遇到网络不好的情况
+# 所以我们可以将镜像打包，用其他的文件传输方式进行传输
 
-```
-docker ps
-```
-
-查看所有容器
-
-```
-docker ps -a
-```
-
-启动、停止、重启容器命令：
-
-```
-docker start container_name/container_id
-docker stop container_name/container_id
-docker restart container_name/container_id
+# 4.1 将本地的镜像导出
+docker save -o 导出的路径名 镜像id
+# 4.2 加载镜像
+docker load -i 导出的路径名 # 这样会导致repository和tag都变成<none>
+# 4.3 修改名称
+docker tag 镜像的id 名称:version
 ```
 
-后台启动一个容器后，如果想进入到这个容器，可以使用attach命令：
 
+
+## 4.4 容器的操作
+
+```shell
+# 1. 运行容器
+# 简单操作
+docker run 镜像的id|镜像名称[:tag]
+# 常用的参数（复杂）
+docker run -d -p hostPort:containerPort --name 容器名称 镜像的id|镜像的名称[:tag]
+# -d: 代表后台运行容器（daemon）
+# -p: 宿主机端口:容器端口
+# --name: 指定容器的名称
 ```
+
+-------------
+
+```shell
+# 2.查看正在运行的容器
+docker ps [-qa]
+# -a: 查看全部的容器，包括没有运行的容器
+# -q: 只查看容器的标识
+```
+
+------------
+
+```shell
+# 3.查看容器的日志
+docker logs -f 容器id
+# -f: 滚动查看日志的最后几行
+```
+
+-----------
+
+```shell
+# 4.进入容器内部
+docker exec -it 容器id bash
 docker attach container_name/container_id
 ```
 
-删除容器的命令：
-
-```
-docker rm container_name/container_id
-```
-
-删除所有停止的容器：
-
-```
-docker rm $(docker ps -a -q)
+```shell
+# 5. 因为容器内部不支持vim，所以如果需要修改文件得拷贝到宿主机，修改完再拷贝回去，很麻烦
+# vscode连接docker 容器，直接进行文件编辑
+# 当在本机\remote-ssh连接到服务器后，服务器上开启了docker的话，点击docker的tab，就能看到信息
+# ctrl-shift-p 输入 attatch， 选择 Remote-Containers:Attach to Running Container
+# 这样就直接进入docker container啦
 ```
 
-查看当前系统Docker信息
+---------------
 
+```shell
+# 6. 停止、删除容器
+docker stop 容器id
+docker stop $(docker ps -qa)
+docker rm 容器id
+docker rm $(dcoker ps -qa) # 删除全部容器
 ```
+
+----------
+
+```shell
+# 7. 重启容器
+docker start 容器id
+```
+
+-----
+
+```shell
+# 查看当前系统Docker信息
 docker info
-```
-
-从Docker hub上下载某个镜像:
-
-```
-docker pull centos:latest
-docker pull centos:latest
 ```
 
 查找Docker Hub上的nginx镜像
@@ -139,8 +228,6 @@ docker search nginx
 ```
 
 执行docker pull centos会将Centos这个仓库下面的所有镜像下载到本地repository。
-
-
 
 启动一个容器并且给容器命名
 
@@ -160,10 +247,6 @@ docker start name
 docker image inspect ...
 ```
 
-
-
-
-
 ## Docker run的参数
 
 - **-t:** 在新容器内指定一个伪终端或终端。
@@ -177,7 +260,27 @@ docker image inspect ...
 
 
 
+# 五、Docker应用
 
+## 5.1 准备War包
+
+## 5.2 准备MySQL容器
+
+```shell
+# 需要指定一个密码 -e
+docker run -d -p 3306:3306 --name mysql5.7 -e MYSQL_ROOT_PASSWORD=admin daocloud.io/library/mysql:5.7.4
+```
+
+## 5.3 准备Tomcat容器
+
+```shell
+# 运行tomcat容器，将war包部署到Tomcat容器内部即可
+docker pull daocloud.io/library/tomcat:8.5.16-jre8
+docker run -d -p 8080:8080 --name tomcat 镜像id
+# 将war包拷贝到容器中
+docker cp 文件名称 容器id:容器内部路径
+docker jenkins.war 容器id:/usr/local/tomcat/webapps/
+```
 
 
 
